@@ -416,8 +416,8 @@ def test_approved_customer_reschedule_updates_route_day_and_enforces_window(work
     )
     latest = save(c["admin"].get(f"/api/orders/{order['id']}"))
     assert latest["parsing_metadata"]["parcel"]["delivery_day"] == tomorrow.date().isoformat()
-    from app.services.workflow import delivery_window
     from app.db.models import Order
+    from app.services.workflow import delivery_window
 
     with db.sessions() as session:
         start, end = delivery_window(session.get(Order, UUID(order["id"])))

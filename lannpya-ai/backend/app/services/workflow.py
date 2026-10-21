@@ -4,14 +4,14 @@ Uses the same orders, buyers and rider assignments as the supplied APIs. Money
 is whole MMK; a rider declaration is never treated as physical hub receipt.
 """
 
-from copy import deepcopy
-from datetime import date, datetime
 import hashlib
 import json
+from copy import deepcopy
+from datetime import date, datetime
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import update
 
 from app.core.order_errors import OrderAPIError
 from app.db.models import DeliveryEvent, Order, User, utcnow
@@ -240,7 +240,7 @@ def prepare_assignment(session, actor, identifier, body, settings, catalog):
     admin(actor)
     from app.db.rider_models import DeliveryAssignment
     from app.schemas.management import ChangeStatus, OrderResponse
-    from app.schemas.riders import AssignOrder, AssignmentResponse
+    from app.schemas.riders import AssignmentResponse, AssignOrder
     from app.services.riders import RiderService
 
     lock_order(session, identifier)

@@ -1,17 +1,37 @@
 """Save a private local source/database checkpoint without changing live data."""
+
 import argparse
-from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import sqlite3
 import zipfile
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-EXCLUDED_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".ruff_cache", ".mypy_cache", ".next", "checkpoints", "build", "dist", "htmlcov"}
-EXCLUDED_FILES = {"workspace_access.json", "private_access.json", ".coverage", "Thumbs.db", ".DS_Store"}
+EXCLUDED_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "__pycache__",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".next",
+    "checkpoints",
+    "build",
+    "dist",
+    "htmlcov",
+}
+EXCLUDED_FILES = {
+    "workspace_access.json",
+    "private_access.json",
+    ".coverage",
+    "Thumbs.db",
+    ".DS_Store",
+}
 RESTORE = """# Restore this checkpoint
 
 This folder is a private local backup, not a public deployment.
@@ -56,14 +76,29 @@ def sha256(data):
 def source_files():
     for directory, folders, files in os.walk(ROOT, followlinks=False):
         base = Path(directory)
-        folders[:] = [name for name in sorted(folders) if name not in EXCLUDED_DIRS and not name.startswith(".pytest") and not (base / name).is_symlink() and (base / name).resolve() != ROOT / "lannpya-ai/backend/data"]
+        folders[:] = [
+            name
+            for name in sorted(folders)
+            if name not in EXCLUDED_DIRS
+            and not name.startswith(".pytest")
+            and not (base / name).is_symlink()
+            and (base / name).resolve() != ROOT / "lannpya-ai/backend/data"
+        ]
         for name in sorted(files):
             path = base / name
             if path.is_symlink() or name in EXCLUDED_FILES:
                 continue
             if name.startswith(".env") and name != ".env.example":
                 continue
-            if path.suffix.lower() in {".pyc", ".pyo", ".sqlite3", ".db", ".log", ".pem", ".key"} or name.endswith((".sqlite3-wal", ".sqlite3-shm", ".db-wal", ".db-shm")):
+            if path.suffix.lower() in {
+                ".pyc",
+                ".pyo",
+                ".sqlite3",
+                ".db",
+                ".log",
+                ".pem",
+                ".key",
+            } or name.endswith((".sqlite3-wal", ".sqlite3-shm", ".db-wal", ".db-shm")):
                 continue
             yield path
 
@@ -96,7 +131,9 @@ def main():
     snapshot = destination / "workspace.sqlite3"
     counts = {}
     if database.is_file():
-        with sqlite3.connect(database.resolve().as_uri()+"?mode=ro", uri=True, timeout=10) as live:
+        with sqlite3.connect(
+            database.resolve().as_uri() + "?mode=ro", uri=True, timeout=10
+        ) as live:
             with sqlite3.connect(snapshot) as saved:
                 live.backup(saved)
                 if saved.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
@@ -117,11 +154,45 @@ def main():
             if sha256(saved.read(item["path"])) != item["sha256"]:
                 raise RuntimeError("Archived source checksum mismatch.")
     (destination / "RESTORE.md").write_text(RESTORE, encoding="utf-8")
-    manifest = {"label": args.label, "created_at_yangon": datetime.now(timezone(timedelta(hours=6, minutes=30))).isoformat(), "source_root": str(ROOT), "verified": True, "source_file_count": len(listing), "database_counts": counts, "archives": {"source.zip": sha256(archive.read_bytes())}, "files": listing, "excluded": ["private runtime tokens", ".env files", "virtual environments", "Git internals", "caches", "prior backups", "browser-local storage"], "previous_test_results": {"javascript": 74, "backend": 435, "browser_visual_qa": "outstanding"}}
+    manifest = {
+        "label": args.label,
+        "created_at_yangon": datetime.now(timezone(timedelta(hours=6, minutes=30))).isoformat(),
+        "source_root": str(ROOT),
+        "verified": True,
+        "source_file_count": len(listing),
+        "database_counts": counts,
+        "archives": {"source.zip": sha256(archive.read_bytes())},
+        "files": listing,
+        "excluded": [
+            "private runtime tokens",
+            ".env files",
+            "virtual environments",
+            "Git internals",
+            "caches",
+            "prior backups",
+            "browser-local storage",
+        ],
+        "previous_test_results": {
+            "javascript": 74,
+            "backend": 435,
+            "browser_visual_qa": "outstanding",
+        },
+    }
     if snapshot.is_file():
         manifest["archives"]["workspace.sqlite3"] = sha256(snapshot.read_bytes())
-    (destination / "manifest.json").write_text(json.dumps(manifest, indent=2)+"\n", encoding="utf-8")
-    print(json.dumps({"checkpoint": str(destination), "source_files": len(listing), "database_snapshot": snapshot.is_file(), "verified": True}))
+    (destination / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
+    print(
+        json.dumps(
+            {
+                "checkpoint": str(destination),
+                "source_files": len(listing),
+                "database_snapshot": snapshot.is_file(),
+                "verified": True,
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

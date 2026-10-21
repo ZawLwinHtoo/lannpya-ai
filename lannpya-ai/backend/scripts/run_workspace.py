@@ -10,7 +10,9 @@ import sys
 import time
 from urllib.request import Request, urlopen
 from uuid import uuid4
+
 from sqlalchemy import select
+
 from app.db.migrations import upgrade_database
 from app.db.models import User
 from app.db.rider_models import RiderProfile
@@ -103,14 +105,16 @@ def main():
                 LANNPYA_DEV_ACCESS_TOKEN=actor["token"],
                 LANNPYA_PARSER_MODE="hybrid",
                 LANNPYA_AI_PROVIDER="mock",
-                LANNPYA_CORS_ORIGINS=json.dumps([
-                    "http://127.0.0.1:8000",
-                    "http://localhost:8000",
-                    "http://127.0.0.1:8001",
-                    "http://localhost:8001",
-                    "http://127.0.0.1:8002",
-                    "http://localhost:8002",
-                ]),
+                LANNPYA_CORS_ORIGINS=json.dumps(
+                    [
+                        "http://127.0.0.1:8000",
+                        "http://localhost:8000",
+                        "http://127.0.0.1:8001",
+                        "http://localhost:8001",
+                        "http://127.0.0.1:8002",
+                        "http://localhost:8002",
+                    ]
+                ),
                 LANNPYA_BUYER_FRONTEND_BASE_URL="http://127.0.0.1:8000",
             )
             processes.append(

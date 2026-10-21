@@ -1,7 +1,7 @@
 """Add route/cash aggregates without rewriting or deleting existing order tables."""
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0004_workflow_routes"

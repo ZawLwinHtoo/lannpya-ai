@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.models import Base, JSON_VALUE
+from app.db.models import JSON_VALUE, Base
 
 
 class WorkflowRoute(Base):

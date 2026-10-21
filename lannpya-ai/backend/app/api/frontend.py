@@ -1,6 +1,7 @@
 """Serve only allowlisted UI assets; never expose backend source or data."""
 
 from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 

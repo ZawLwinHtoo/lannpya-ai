@@ -56,9 +56,15 @@ def test_refuses_order_with_route_rider_or_cash_history(tmp_path, history):
         if history == "rider":
             c.execute("INSERT INTO delivery_assignments VALUES (?)", (target,))
         elif history == "route":
-            c.execute("INSERT INTO workflow_routes VALUES (?)", (json.dumps({"order_ids":[str(UUID(target))]}),))
+            c.execute(
+                "INSERT INTO workflow_routes VALUES (?)",
+                (json.dumps({"order_ids": [str(UUID(target))]}),),
+            )
         else:
-            c.execute("UPDATE orders SET parsing_metadata=? WHERE id=?", (json.dumps({"parcel":{"collection":{"actual":100}}}), target))
+            c.execute(
+                "UPDATE orders SET parsing_metadata=? WHERE id=?",
+                (json.dumps({"parcel": {"collection": {"actual": 100}}}), target),
+            )
     with pytest.raises(ValueError):
         delete_test_order(path, target)
     with sqlite3.connect(path) as c:

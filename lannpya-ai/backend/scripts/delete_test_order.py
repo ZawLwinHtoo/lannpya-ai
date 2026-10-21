@@ -3,11 +3,12 @@
 Never deletes users, riders, routes or financial records. Not a production
 retention/erasure API. The exact existing workspace database is the only target.
 """
+
 import argparse
-from datetime import UTC, datetime
 import json
-from pathlib import Path
 import sqlite3
+from datetime import UTC, datetime
+from pathlib import Path
 from uuid import UUID, uuid4
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -26,23 +27,41 @@ def delete_test_order(database, order_id):
         ).fetchone()
         if not row:
             raise ValueError("Order not found; no records were changed.")
-        if row[0] not in {"DRAFT", "NEEDS_REVIEW", "AWAITING_CONFIRMATION", "CONFIRMED", "READY_FOR_DISPATCH"}:
+        if row[0] not in {
+            "DRAFT",
+            "NEEDS_REVIEW",
+            "AWAITING_CONFIRMATION",
+            "CONFIRMED",
+            "READY_FOR_DISPATCH",
+        }:
             raise ValueError("Only an undeparted test order can be removed by this tool.")
         metadata = json.loads(row[1])
         context = metadata.get("parcel", {})
-        if context.get("route_id") or context.get("collection") or metadata.get("delivery_completion"):
+        if (
+            context.get("route_id")
+            or context.get("collection")
+            or metadata.get("delivery_completion")
+        ):
             raise ValueError("Order has route/cash history; deletion refused.")
         for table in ("delivery_assignments", "rider_action_receipts"):
-            if connection.execute(f"SELECT count(*) FROM {table} WHERE order_id=?", (identifier,)).fetchone()[0]:
+            if connection.execute(
+                f"SELECT count(*) FROM {table} WHERE order_id=?", (identifier,)
+            ).fetchone()[0]:
                 raise ValueError("Order has rider history; deletion refused.")
         for (data,) in connection.execute("SELECT data FROM workflow_routes"):
             route = json.loads(data)
             if identifier in {UUID(value).hex for value in route.get("order_ids", [])}:
                 raise ValueError("Order is referenced by a route; deletion refused.")
-        before = {table: connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0] for table in ("users", "rider_profiles", "workflow_routes", "orders")}
+        before = {
+            table: connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+            for table in ("users", "rider_profiles", "workflow_routes", "orders")
+        }
         backup_dir = database.parent / "backups"
         backup_dir.mkdir(exist_ok=True)
-        backup = backup_dir / f"before-delete-{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{uuid4().hex[:8]}.sqlite3"
+        backup = (
+            backup_dir
+            / f"before-delete-{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{uuid4().hex[:8]}.sqlite3"
+        )
         # The reserved write lock stops competing mutations while a second,
         # read-only connection takes a consistent SQLite backup of the old state.
         with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as source:
@@ -59,20 +78,35 @@ def delete_test_order(database, order_id):
             "DELETE FROM buyer_sessions WHERE link_id IN (SELECT id FROM confirmation_links WHERE order_id=?)",
             (identifier,),
         ).rowcount
-        for table in ("buyer_requests", "location_references", "confirmation_links", "delivery_events", "orders"):
+        for table in (
+            "buyer_requests",
+            "location_references",
+            "confirmation_links",
+            "delivery_events",
+            "orders",
+        ):
             column = "id" if table == "orders" else "order_id"
-            counts[table] = connection.execute(f"DELETE FROM {table} WHERE {column}=?", (identifier,)).rowcount
+            counts[table] = connection.execute(
+                f"DELETE FROM {table} WHERE {column}=?", (identifier,)
+            ).rowcount
         if counts["orders"] != 1:
             raise RuntimeError("Expected exactly one order; transaction rolled back.")
         for table in ("users", "rider_profiles", "workflow_routes"):
             if connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0] != before[table]:
-                raise RuntimeError("Protected profile/route counts changed; transaction rolled back.")
+                raise RuntimeError(
+                    "Protected profile/route counts changed; transaction rolled back."
+                )
         if connection.execute("SELECT count(*) FROM orders").fetchone()[0] != before["orders"] - 1:
             raise RuntimeError("Unexpected order count; transaction rolled back.")
         if connection.execute("PRAGMA foreign_key_check").fetchone():
             raise RuntimeError("Foreign key check failed; transaction rolled back.")
         connection.commit()
-        return {"deleted_order_id": str(UUID(identifier)), "deleted": counts, "backup": str(backup), "profiles_preserved": True}
+        return {
+            "deleted_order_id": str(UUID(identifier)),
+            "deleted": counts,
+            "backup": str(backup),
+            "profiles_preserved": True,
+        }
     except Exception:
         connection.rollback()
         raise
