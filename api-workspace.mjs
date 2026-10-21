@@ -12,7 +12,7 @@ const json=body=>({method:'POST',body});
 const money=value=>value==null?'Unknown':`${BigInt(value).toLocaleString()} MMK`;
 let page='',generation=0,locked=false,orders=[],riders=[],routes=[],queue=[],current=null,requests=[],buyerCard=null,buyerDetails=null,linkURL='',notice='',undoTimer=null;
 let buyerBase=location.protocol==='http:'?location.origin:'http://127.0.0.1:8000';
-const baseFor=side=>api.connections[side]?.baseUrl||(side==='rider'?'http://127.0.0.1:8001':'http://127.0.0.1:8000');
+const baseFor=side=>api.connections[side]?.baseUrl||(side==='rider'?(location.port==='8002'?'http://127.0.0.1:8002':'http://127.0.0.1:8001'):(location.protocol==='http:'?location.origin:'http://127.0.0.1:8000'));
 
 // Theme helpers share the same native orders, routes and delivery actions.
 function icon(name){
@@ -161,7 +161,7 @@ function bindForm(id,handler,refresh=true){const f=document.querySelector('#'+id
 function wire(){
   // In-page navigation is presentation state, never a new API workspace route.
   document.querySelectorAll('a[data-section]').forEach(link=>link.onclick=e=>{const target=document.querySelector('#'+link.dataset.section);if(target){e.preventDefault();target.scrollIntoView?.({behavior:'smooth',block:'start'});}});
-  bindForm('connect-form',async(data,form)=>{await api.connect(form.dataset.side,data.get('base'),data.get('token'));data.set?.('token','');return 'Connected to the server-bound actor.';});
+  bindForm('connect-form',async(data,form)=>{await api.connect(form.dataset.side,String(data.get('base')||'').trim(),String(data.get('token')||'').trim());data.set?.('token','');return 'Connected to the server-bound actor.';});
   bindForm('create-form',async data=>{const row=await api.create(Object.fromEntries(data));orders.unshift(row);notice='Order created. Generate its customer link after reviewing fields.';location.hash='#/order/'+row.id;},false);
   const payment=document.querySelector('[name="payment"]');if(payment)payment.onchange=()=>{if(payment.value==='prepaid')document.querySelector('[name="cod_amount"]').value='0';};
   bindForm('parse-form',async(data)=>{

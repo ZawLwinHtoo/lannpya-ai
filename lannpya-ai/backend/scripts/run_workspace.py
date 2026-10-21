@@ -25,6 +25,16 @@ def prepare():
     db = Database(database_url)
     upgrade_database(db)
     actors = {}
+    existing_tokens = {}
+    access = data / "workspace_access.json"
+    if access.is_file():
+        try:
+            old = json.loads(access.read_text(encoding="utf-8"))
+            for k, v in old.items():
+                if isinstance(v, dict) and "token" in v and len(v["token"]) >= 32:
+                    existing_tokens[k] = v["token"]
+        except Exception:
+            pass
     try:
         with db.sessions.begin() as session:
             for key, name, role, port in [
@@ -51,7 +61,7 @@ def prepare():
                     "name": user.name,
                     "id": str(user.id),
                     "base_url": f"http://127.0.0.1:{port}",
-                    "token": secrets.token_urlsafe(48),
+                    "token": existing_tokens.get(key) or secrets.token_urlsafe(48),
                     "port": port,
                 }
     finally:
@@ -93,7 +103,14 @@ def main():
                 LANNPYA_DEV_ACCESS_TOKEN=actor["token"],
                 LANNPYA_PARSER_MODE="hybrid",
                 LANNPYA_AI_PROVIDER="mock",
-                LANNPYA_CORS_ORIGINS=json.dumps(["http://127.0.0.1:8000", "http://localhost:8000"]),
+                LANNPYA_CORS_ORIGINS=json.dumps([
+                    "http://127.0.0.1:8000",
+                    "http://localhost:8000",
+                    "http://127.0.0.1:8001",
+                    "http://localhost:8001",
+                    "http://127.0.0.1:8002",
+                    "http://localhost:8002",
+                ]),
                 LANNPYA_BUYER_FRONTEND_BASE_URL="http://127.0.0.1:8000",
             )
             processes.append(
