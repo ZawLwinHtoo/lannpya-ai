@@ -117,25 +117,31 @@ def main():
                 ),
                 LANNPYA_BUYER_FRONTEND_BASE_URL="http://127.0.0.1:8000",
             )
-            processes.append(
-                subprocess.Popen(
-                    [
-                        sys.executable,
-                        "-m",
-                        "uvicorn",
-                        "app.main:app",
-                        "--host",
-                        "127.0.0.1",
-                        "--port",
-                        str(actor["port"]),
-                        "--no-access-log",
-                        "--no-proxy-headers",
-                    ],
-                    cwd=BACKEND_ROOT,
-                    env=env,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                )
+            log_dir = BACKEND_ROOT / "data" / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = open(log_dir / f"actor_{actor['port']}.log", "w", encoding="utf-8")
+            proc = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-m",
+                    "uvicorn",
+                    "app.main:app",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    str(actor["port"]),
+                    "--no-access-log",
+                    "--no-proxy-headers",
+                ],
+                cwd=BACKEND_ROOT,
+                env=env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
+            proc._log_file = log_file
+            proc._actor = actor
+            processes.append(proc)
         print("Local workspace: http://127.0.0.1:8000/api.html", flush=True)
         print(f"Private connection details: {access} (do not share or serve)", flush=True)
         print(
@@ -174,6 +180,21 @@ def main():
             return
         while all(p.poll() is None for p in processes):
             time.sleep(0.5)
+        failed = [p for p in processes if p.poll() is not None]
+        for p in failed:
+            actor = getattr(p, "_actor", {})
+            print(
+                f"Actor {actor.get('name', 'unknown')} on port {actor.get('port')} stopped (exit code: {p.poll()})",
+                file=sys.stderr,
+                flush=True,
+            )
+            log_path = BACKEND_ROOT / "data" / "logs" / f"actor_{actor.get('port')}.log"
+            if log_path.exists():
+                print(
+                    f"--- Last log output for port {actor.get('port')} ---\n{log_path.read_text(encoding='utf-8')[-1000:]}",
+                    file=sys.stderr,
+                    flush=True,
+                )
         raise RuntimeError("A workspace API stopped; shutting down the remaining instances.")
     except KeyboardInterrupt:
         pass
@@ -186,6 +207,11 @@ def main():
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
+            if hasattr(process, "_log_file"):
+                try:
+                    process._log_file.close()
+                except Exception:
+                    pass
 
 
 if __name__ == "__main__":
