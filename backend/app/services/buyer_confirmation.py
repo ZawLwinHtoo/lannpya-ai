@@ -78,13 +78,14 @@ def revoke_phone_links(session, order):
 
 
 class BuyerConfirmationService:
-    def __init__(self, session, settings, catalog, boundaries):
+    def __init__(self, session, settings, catalog, boundaries, geocoder=None):
         self.session, self.settings, self.catalog, self.boundaries = (
             session,
             settings,
             catalog,
             boundaries,
         )
+        self.geocoder = geocoder
 
     def event(self, order, kind, metadata, previous=None):
         self.session.add(
@@ -303,12 +304,33 @@ class BuyerConfirmationService:
                 "street",
                 "landmark",
                 "building_floor_unit",
+                "building",
+                "floor",
+                "unit",
                 "latitude",
                 "longitude",
                 "delivery_time_window",
                 "delivery_instructions",
             )
         }
+        # Keep the buyer's latest pending pin separate from canonical order coordinates.
+        # A rejected/newer request must never resurrect an older pending suggestion.
+        latest = self.session.scalar(
+            select(BuyerRequest)
+            .where(
+                BuyerRequest.order_id == order.id,
+                BuyerRequest.link_id == link.id,
+                BuyerRequest.kind == "LOCATION",
+            )
+            .order_by(BuyerRequest.created_at.desc(), BuyerRequest.id.desc())
+            .limit(1)
+        )
+        result["coordinate_source"] = (order.field_sources or {}).get("latitude", {}).get("method")
+        result["pending_location"] = (
+            {**latest.submitted_values, "status": "PENDING_REVIEW"}
+            if latest and latest.decision == "REVIEW_REQUIRED" and latest.resolution is None
+            else None
+        )
         result.update(
             {
                 "order_reference": str(order.id),
@@ -327,7 +349,12 @@ class BuyerConfirmationService:
                 },
             }
         )
+        scope = str(link.id)
         self.session.commit()
+        # Network latency must not hold the order/link write lock. Only this
+        # authorized private response may contain an unconfirmed suggestion.
+        if self.geocoder is not None:
+            result["geocoding"] = self.geocoder.suggest(result, scope)
         return result
 
     def previous_retry(self, link, body, kind):

@@ -5756,6 +5756,39 @@
             ],
             "title": "Building Floor Unit"
           },
+          "building": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
           "latitude": {
             "anyOf": [
               {
@@ -5804,6 +5837,30 @@
             "type": "boolean",
             "title": "Initial Pin Requires Review"
           },
+          "coordinate_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinate Source"
+          },
+          "pending_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BuyerPendingLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "geocoding": {
+            "$ref": "#/components/schemas/BuyerGeocodingResult"
+          },
           "policy": {
             "additionalProperties": true,
             "type": "object",
@@ -5826,6 +5883,104 @@
           "policy"
         ],
         "title": "BuyerDetailsResult"
+      },
+      "BuyerGeocodingResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "DISABLED",
+              "STORED_COORDINATES",
+              "PENDING_REVIEW",
+              "NOT_EDITABLE",
+              "MAP_CONFIGURATION_REQUIRED",
+              "CREDENTIAL_REQUIRED",
+              "BROWSER_KEY_REJECTED",
+              "INCOMPLETE_ADDRESS",
+              "SUGGESTION",
+              "AMBIGUOUS",
+              "NO_RESULT",
+              "RATE_LIMITED",
+              "CREDENTIAL_OR_PERMISSION_DENIED",
+              "TIMEOUT",
+              "INVALID_RESPONSE",
+              "PROVIDER_UNAVAILABLE",
+              "BUDGET_EXHAUSTED",
+              "ALREADY_ATTEMPTED",
+              "CONFIGURATION_ERROR"
+            ],
+            "title": "Status",
+            "default": "DISABLED"
+          },
+          "provider": {
+            "type": "string",
+            "const": "GOOGLE_GEOCODING_V4",
+            "title": "Provider",
+            "default": "GOOGLE_GEOCODING_V4"
+          },
+          "observation": {
+            "type": "string",
+            "enum": [
+              "NOT_ATTEMPTED",
+              "GOOGLE_MOCK",
+              "GOOGLE_LIVE"
+            ],
+            "title": "Observation",
+            "default": "NOT_ATTEMPTED"
+          },
+          "cache_hit": {
+            "type": "boolean",
+            "title": "Cache Hit",
+            "default": false
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BuyerGeocodingSuggestion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "BuyerGeocodingResult"
+      },
+      "BuyerGeocodingSuggestion": {
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "requires_confirmation": {
+            "type": "boolean",
+            "const": true,
+            "title": "Requires Confirmation",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "latitude",
+          "longitude",
+          "expires_at"
+        ],
+        "title": "BuyerGeocodingSuggestion"
       },
       "BuyerHistoryItem": {
         "properties": {
@@ -6023,6 +6178,30 @@
           "longitude"
         ],
         "title": "BuyerLocation"
+      },
+      "BuyerPendingLocation": {
+        "properties": {
+          "latitude": {
+            "type": "string",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "string",
+            "title": "Longitude"
+          },
+          "status": {
+            "type": "string",
+            "const": "PENDING_REVIEW",
+            "title": "Status",
+            "default": "PENDING_REVIEW"
+          }
+        },
+        "type": "object",
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "title": "BuyerPendingLocation"
       },
       "BuyerResponse": {
         "properties": {

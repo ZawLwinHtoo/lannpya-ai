@@ -1,5 +1,8 @@
 // Complete local mapping journey at every requested viewport. Synthetic data/GPS; no live maps APIs.
 const {test,expect,inspect,saveManual,openDraftRoute}=require('./fixtures.cjs');
+const {installGoogleBuyerFixture}=require('./google-buyer-fixture.cjs');
+test.use({googleBrowser:true});
+test.beforeEach(async({page})=>installGoogleBuyerFixture(page));
 const path=require('node:path');
 const fs=require('node:fs');
 const output=path.resolve('.tmp/mapping-release/screenshots');
@@ -26,7 +29,7 @@ for(const [width,height] of [[1440,900],[1366,768],[768,1024],[390,844],[360,740
       await expect(page.locator('#map-selection-status')).toContainText('does not independently verify');
       await map.scrollIntoViewIfNeeded();
       if(width<=768){const b=await map.boundingBox();await page.touchscreen.tap(b.x+b.width/2+8,b.y+b.height/2+8);}else await map.click({position:{x:160,y:140}});
-      const before=await page.locator('[name=longitude]').inputValue(),pin=page.locator('#buyer-map .leaflet-marker-draggable');await pin.scrollIntoViewIfNeeded();const b=await pin.boundingBox();
+      const before=await page.locator('[name=longitude]').inputValue(),pin=page.locator('#buyer-map [data-google-fixture-marker]');await pin.scrollIntoViewIfNeeded();const b=await pin.boundingBox();
       if(width<=768){
         const session=await page.context().newCDPSession(page),x=b.x+15,y=b.y+15;
         await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});

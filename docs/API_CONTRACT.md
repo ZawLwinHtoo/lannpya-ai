@@ -1185,3 +1185,35 @@ snapshots are [OPENAPI.json](OPENAPI.json) and [integration/OPENAPI.json](integr
 with 45 operations. See the [mapping contract](mapping-routing/API_CONTRACT.md) for
 Google's consented single-route endpoint, bounded ORS matrix authorization, additive
 matrix provenance fields, and unchanged route preview/commit/rider-plan endpoints.
+
+
+### Buyer map prefill and revisits
+
+`GET /api/confirm/{token}/details` still requires valid buyer authorization.
+It now also returns nullable `building`, `floor`, `unit`, `coordinate_source`
+and `pending_location`. A pending location has `latitude`, `longitude` and
+`status: "PENDING_REVIEW"`; it belongs to the current link's latest unresolved
+location request. Canonical `latitude`/`longitude` remain separate until approval.
+Rejected requests are not used as prefill. Public card responses are unchanged.
+
+The verified customer screen displays the existing address and initializes a
+modifiable marker from the pending request, if any, otherwise canonical order
+coordinates. Displaying the marker does not submit or confirm it. Refresh reuses
+valid server-bound buyer authorization; expired authorization requires phone
+verification again. Initial/untrusted pins continue to require dispatcher review.
+
+Server-side Google Geocoding v4 is implemented with explicit credential,
+permission and request-budget gates (default disabled, budget zero). Verified
+details add a `geocoding` object containing status, provider, observation,
+`cache_hit` and an optional unconfirmed coordinate suggestion with UTC expiry.
+Stored/pending coordinates bypass lookup. A successful cached suggestion does not
+write canonical GPS or create a buyer request; only explicit buyer submission
+enters the existing dispatcher-review flow. Manual/GPS selection remains available
+when disabled, ambiguous, expired or unavailable.
+
+The buyer-only renderer selects Google Maps JavaScript through
+`maps-config.js` (`buyerPinProvider: "google"`); other maps retain their existing
+provider. A Google-derived suggestion is withheld if the Google map cannot load.
+A dedicated server geocoding credential is required; the website-restricted key
+is never a backend fallback. See
+[automatic geocoding configuration, cache and verification](integration/BUYER_AUTOMATIC_GEOCODING.md).

@@ -260,7 +260,11 @@ def create_dashboard(origin="http://127.0.0.1:8765", *, sandbox_factory=Sandbox,
     @app.get("/maps-config.js")
     def maps_config():
         # A referrer-restricted browser key; it is visible to the browser by design.
-        body = "globalThis.LANNPYA_MAPS=" + json.dumps({"googleKey": maps_key or ""}) + ";"
+        body = (
+            "globalThis.LANNPYA_MAPS="
+            + json.dumps({"googleKey": maps_key or "", "buyerPinProvider": "google"})
+            + ";"
+        )
         return Response(body, media_type="text/javascript")
 
     @app.get("/runtime-config.js")

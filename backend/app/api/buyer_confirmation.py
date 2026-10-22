@@ -45,6 +45,7 @@ def service(request, session):
         request.app.state.settings,
         request.app.state.location_catalog,
         request.app.state.township_boundaries,
+        request.app.state.buyer_geocoder,
     )
 
 

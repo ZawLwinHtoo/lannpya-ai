@@ -1,0 +1,11 @@
+{
+  "results": [{
+    "location": {"latitude": 16.8102468, "longitude": 96.1101357},
+    "granularity": "ROOFTOP",
+    "types": ["street_address"],
+    "addressComponents": [
+      {"shortText": "MM", "longText": "Myanmar", "types": ["country"]},
+      {"longText": "Hlaing", "types": ["sublocality"]}
+    ]
+  }]
+}

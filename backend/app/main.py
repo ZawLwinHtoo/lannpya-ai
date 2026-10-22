@@ -24,6 +24,7 @@ from app.core.order_errors import OrderAPIError
 from app.db.session import Database
 from app.parsing.places import LocationCatalog
 from app.routing.base import RoutingFailure
+from app.services.buyer_geocoding import BuyerGeocoder
 from app.services.buyer_policy import TownshipBoundaryResolver
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,7 @@ def create_app(
     )
     application.state.parser_mode = settings.parser_mode
     application.state.settings = settings
+    application.state.buyer_geocoder = BuyerGeocoder(settings)
     application.state.database = active_database
     application.state.township_boundaries = (
         township_boundaries if township_boundaries is not None else TownshipBoundaryResolver()

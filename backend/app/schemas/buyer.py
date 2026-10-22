@@ -42,6 +42,48 @@ class BuyerActionResult(BaseModel):
     resolution: Literal["APPROVE", "REJECT"] | None
 
 
+class BuyerPendingLocation(BaseModel):
+    latitude: Decimal
+    longitude: Decimal
+    status: Literal["PENDING_REVIEW"] = "PENDING_REVIEW"
+
+
+class BuyerGeocodingSuggestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    expires_at: datetime
+    requires_confirmation: Literal[True] = True
+
+
+class BuyerGeocodingResult(BaseModel):
+    status: Literal[
+        "DISABLED",
+        "STORED_COORDINATES",
+        "PENDING_REVIEW",
+        "NOT_EDITABLE",
+        "MAP_CONFIGURATION_REQUIRED",
+        "CREDENTIAL_REQUIRED",
+        "BROWSER_KEY_REJECTED",
+        "INCOMPLETE_ADDRESS",
+        "SUGGESTION",
+        "AMBIGUOUS",
+        "NO_RESULT",
+        "RATE_LIMITED",
+        "CREDENTIAL_OR_PERMISSION_DENIED",
+        "TIMEOUT",
+        "INVALID_RESPONSE",
+        "PROVIDER_UNAVAILABLE",
+        "BUDGET_EXHAUSTED",
+        "ALREADY_ATTEMPTED",
+        "CONFIGURATION_ERROR",
+    ] = "DISABLED"
+    provider: Literal["GOOGLE_GEOCODING_V4"] = "GOOGLE_GEOCODING_V4"
+    observation: Literal["NOT_ATTEMPTED", "GOOGLE_MOCK", "GOOGLE_LIVE"] = "NOT_ATTEMPTED"
+    cache_hit: bool = False
+    suggestion: BuyerGeocodingSuggestion | None = None
+
+
 class BuyerDetailsResult(BaseModel):
     order_reference: UUID
     status: OrderStatus
@@ -49,11 +91,17 @@ class BuyerDetailsResult(BaseModel):
     street: str | None
     landmark: str | None
     building_floor_unit: str | None
+    building: str | None = None
+    floor: str | None = None
+    unit: str | None = None
     latitude: Decimal | None
     longitude: Decimal | None
     delivery_time_window: str | None
     delivery_instructions: str | None
     initial_pin_requires_review: bool
+    coordinate_source: str | None = None
+    pending_location: BuyerPendingLocation | None = None
+    geocoding: BuyerGeocodingResult = Field(default_factory=BuyerGeocodingResult)
     policy: dict
 
 

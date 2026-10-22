@@ -108,3 +108,36 @@ test('buyer confirmation keeps submitted values only after both writes succeed',
  failResponse=false;await store.confirm(token,request);
  assert.equal(store.customer(token).order.confirmation.note,'Call at the gate');assert.deepEqual(store.customer(token).order.confirmation.pin,request.pin);assert.equal(store.customer(token).order.confirmation.date,request.date);
 });
+
+
+test('buyer map restores stored and pending coordinates and complete address without geocoding',async()=>{
+ const f=apiFixture();let detail={order_reference:'test-order',status:'NEEDS_REVIEW',township:'Hlaing',street:'Synthetic street',landmark:'Test gate',floor:'3',latitude:'16.81',longitude:'96.11',initial_pin_requires_review:true,coordinate_source:'manual_correction'};
+ f.api.openBuyer=()=>{f.api.buyer={card:async()=>({state:'VERIFICATION_REQUIRED'}),details:async()=>structuredClone(detail)};};
+ const token='b'.repeat(43),store=await createLiveStore(W(),{api:f.api,origin:'http://127.0.0.1:8784',route:'track/'+token});
+ assert.equal(store.customer(token).verified,true);
+ assert.deepEqual(store.customer(token).order.pin,{lat:16.81,lng:96.11});
+ assert.equal(store.customer(token).order.floor,'3');assert.equal(store.customer(token).order.areaId,'Hlaing');
+ detail.pending_location={latitude:'16.82',longitude:'96.12',status:'PENDING_REVIEW'};
+ await store.sync('track/'+token);assert.deepEqual(store.customer(token).order.pin,{lat:16.82,lng:96.12});assert.equal(store.customer(token).order.location,'pending_review');
+ detail={...detail,latitude:null,longitude:null,pending_location:null};await store.sync('track/'+token);assert.equal(store.customer(token).order.pin,null);
+ detail={...detail,latitude:'',longitude:'96.1'};await store.sync('track/'+token);assert.equal(store.customer(token).order.pin,null);
+ detail={...detail,latitude:'91',longitude:'96.1'};await store.sync('track/'+token);assert.equal(store.customer(token).order.pin,null);
+ assert.deepEqual(f.calls,[]);
+});
+
+test('expired buyer authorization clears restored map details without privileged fallback',async()=>{
+ const f=apiFixture();let expired=false;
+ f.api.openBuyer=()=>{f.api.buyer={card:async()=>({state:'VERIFICATION_REQUIRED'}),details:async()=>{if(expired)throw Object.assign(Error('Authorization required'),{status:401});return {order_reference:'test',status:'NEEDS_REVIEW',latitude:'0',longitude:'0'};}};};
+ const token='c'.repeat(43),store=await createLiveStore(W(),{api:f.api,origin:'http://127.0.0.1:8784',route:'track/'+token});
+ assert.deepEqual(store.customer(token).order.pin,{lat:0,lng:0});expired=true;await store.sync('track/'+token);assert.equal(store.customer(token).verified,false);assert.equal(store.customer(token).order.pin,undefined);assert.deepEqual(f.calls,[]);
+});
+
+
+test('buyer geocoding suggestion is unconfirmed, loses to stored coordinates and expires safely',async()=>{
+ const f=apiFixture();let detail={order_reference:'test',status:'NEEDS_REVIEW',township:'Hlaing',street:'Test street',geocoding:{status:'SUGGESTION',observation:'GOOGLE_MOCK',suggestion:{latitude:16.81,longitude:96.11,expires_at:new Date(Date.now()+600000).toISOString(),requires_confirmation:true}}};
+ f.api.openBuyer=()=>{f.api.buyer={card:async()=>({state:'VERIFICATION_REQUIRED'}),details:async()=>structuredClone(detail)};};
+ const token='d'.repeat(43),store=await createLiveStore(W(),{api:f.api,origin:'http://127.0.0.1:8784',route:'track/'+token});
+ assert.equal(store.customer(token).order.location,'geocoded_suggestion');assert.equal(store.customer(token).order.confirmation,null);assert.deepEqual(store.customer(token).order.pin,{lat:16.81,lng:96.11});
+ detail={...detail,latitude:'16.82',longitude:'96.12'};await store.sync('track/'+token);assert.deepEqual(store.customer(token).order.pin,{lat:16.82,lng:96.12});
+ detail={...detail,latitude:null,longitude:null,geocoding:{...detail.geocoding,suggestion:{...detail.geocoding.suggestion,expires_at:'2000-01-01T00:00:00Z'}}};await store.sync('track/'+token);assert.equal(store.customer(token).order.pin,null);assert.deepEqual(f.calls,[]);
+});

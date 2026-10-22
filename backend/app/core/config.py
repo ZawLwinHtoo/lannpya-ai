@@ -56,6 +56,21 @@ class Settings(BaseSettings):
     # Separate public Maps JavaScript key; require Website + API restrictions in Google Cloud.
     google_maps_browser_key: str | None = Field(default=None, max_length=200)
     google_maps_browser_restrictions_confirmed: bool = False
+    # Geocoding v4 is server-only and has an independent, default-zero request budget.
+    google_geocoding_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "LANNPYA_GOOGLE_GEOCODING_API_KEY", "GOOGLE_GEOCODING_API_KEY"
+        ),
+    )
+    google_geocoding_permissions_confirmed: bool = False
+    google_geocoding_external_requests_enabled: bool = False
+    google_geocoding_max_requests: int = Field(default=0, ge=0, le=10)
+    google_geocoding_timeout_seconds: float = Field(default=5, gt=0, le=15, allow_inf_nan=False)
+    google_geocoding_cache_seconds: int = Field(default=900, ge=60, le=86400)
+    google_geocoding_budget_directory: Path = (
+        Path(__file__).resolve().parents[3] / ".tmp/google-geocoding-budget"
+    )
     buyer_request_limit_per_minute: int = Field(default=60, ge=1, le=600)
     buyer_verify_limit_per_minute: int = Field(default=10, ge=1, le=60)
     buyer_rescheduling_enabled: bool = False

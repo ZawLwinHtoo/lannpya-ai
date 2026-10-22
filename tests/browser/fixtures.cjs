@@ -11,7 +11,9 @@ const sanitize=s=>String(s).replace(/[A-Za-z0-9_-]{43,}/g,'[redacted]').replace(
 const test=base.extend({
   orsMock:[false,{option:true}],
   googleBrowser:[false,{option:true}],
-  app:async({orsMock,googleBrowser},use,testInfo)=>{
+  geocodingMock:[false,{option:true}],
+  app:async({orsMock,googleBrowser,geocodingMock},use,testInfo)=>{
+    if(orsMock&&geocodingMock)throw Error('Use separate isolated ORS and geocoding fixtures; no combined external transport.');
     const probe=net.createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');
     const port=probe.address().port;await new Promise(r=>probe.close(r));
     const origin=`http://127.0.0.1:${port}`;
@@ -38,10 +40,32 @@ with tempfile.TemporaryDirectory(prefix='lannpya-ors-browser-budget-') as ledger
     os.environ['LANNPYA_ORS_BUDGET_DIRECTORY'] = ledger
     main()
 `;
-    const argv=orsMock?['-c',mockCode,'--port',String(port),'--temporary']:['-m','tools.integrated_workspace','--port',String(port),'--temporary'];
+    const geocodingCode=`import json, os, tempfile
+from pathlib import Path
+import httpx2 as httpx
+from app.services.buyer_geocoding import BuyerGeocoder
+from tools.integrated_workspace import main
+original = BuyerGeocoder.__init__
+def handle(request):
+    assert request.method == 'GET' and request.url.host == 'geocode.googleapis.com'
+    assert request.url.path.startswith('/v4/geocode/address/')
+    data = json.loads(Path(os.environ['LANNPYA_GEOCODING_TEST_RECORDING']).read_text())
+    mode = os.environ['LANNPYA_GEOCODING_TEST_MODE']
+    if mode == 'ambiguous':
+        data['results'][0]['granularity'] = 'APPROXIMATE'
+        data['results'][0]['types'] = ['locality']
+    return httpx.Response(403 if mode == 'failure' else 200, json=data)
+def initialize(self, settings, **kwargs):
+    original(self, settings, transport=httpx.MockTransport(handle))
+BuyerGeocoder.__init__ = initialize
+with tempfile.TemporaryDirectory(prefix='lannpya-geocoding-fixture-budget-') as ledger:
+    os.environ['LANNPYA_GOOGLE_GEOCODING_BUDGET_DIRECTORY'] = ledger
+    main()
+`;
+    const argv=geocodingMock?['-c',geocodingCode,'--port',String(port),'--temporary']:orsMock?['-c',mockCode,'--port',String(port),'--temporary']:['-m','tools.integrated_workspace','--port',String(port),'--temporary'];
     const child=spawn(pythonPath(),argv,{
       cwd:path.join(root,'backend'),stdio:['ignore','ignore','pipe'],windowsHide:true,
-      env:{...process.env,LANNPYA_ORS_TEST_RECORDING:orsMock==='phase36'?path.join(root,'backend/tests/fixtures/routing/ors_yangon_phase36.json'):'',LANNPYA_ENVIRONMENT:'test',LANNPYA_ROUTING_PROVIDER:orsMock?'ors':'offline',LANNPYA_ROUTING_EXTERNAL_REQUESTS_ENABLED:orsMock?'true':'false',LANNPYA_ORS_API_KEY:orsMock?'fictional-server-only-key':'',LANNPYA_ORS_MAX_REQUESTS:orsMock?'1':'0',LANNPYA_ORS_MAX_MATRIX_ELEMENTS:'16',LANNPYA_GOOGLE_DEMO_ENABLED:'false',LANNPYA_GOOGLE_DEMO_MAX_REQUESTS:'0',LANNPYA_GOOGLE_MAPS_BROWSER_KEY:googleBrowser?'fictional-browser-only-fixture':'',LANNPYA_GOOGLE_MAPS_BROWSER_RESTRICTIONS_CONFIRMED:googleBrowser?'true':'false'},
+      env:{...process.env,LANNPYA_GEOCODING_TEST_RECORDING:path.join(root,'backend/tests/fixtures/geocoding/google_yangon_v4.json'),LANNPYA_GEOCODING_TEST_MODE:geocodingMock||'',LANNPYA_GOOGLE_GEOCODING_API_KEY:geocodingMock?'fictional-server-geocoding-fixture':'',LANNPYA_GOOGLE_GEOCODING_PERMISSIONS_CONFIRMED:geocodingMock?'true':'false',LANNPYA_GOOGLE_GEOCODING_EXTERNAL_REQUESTS_ENABLED:geocodingMock?'true':'false',LANNPYA_GOOGLE_GEOCODING_MAX_REQUESTS:geocodingMock?'1':'0',LANNPYA_ORS_TEST_RECORDING:orsMock==='phase36'?path.join(root,'backend/tests/fixtures/routing/ors_yangon_phase36.json'):'',LANNPYA_ENVIRONMENT:'test',LANNPYA_ROUTING_PROVIDER:orsMock?'ors':'offline',LANNPYA_ROUTING_EXTERNAL_REQUESTS_ENABLED:orsMock?'true':'false',LANNPYA_ORS_API_KEY:orsMock?'fictional-server-only-key':'',LANNPYA_ORS_MAX_REQUESTS:orsMock?'1':'0',LANNPYA_ORS_MAX_MATRIX_ELEMENTS:'16',LANNPYA_GOOGLE_DEMO_ENABLED:'false',LANNPYA_GOOGLE_DEMO_MAX_REQUESTS:'0',LANNPYA_GOOGLE_MAPS_BROWSER_KEY:googleBrowser?'fictional-browser-only-fixture':'',LANNPYA_GOOGLE_MAPS_BROWSER_RESTRICTIONS_CONFIRMED:googleBrowser?'true':'false'},
     });
     let stderr='';child.stderr.on('data',b=>{stderr+=b.toString();});
     const exited=once(child,'exit');let cookie='',csrf;

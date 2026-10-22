@@ -117,10 +117,10 @@ test('invalid Google geometry is rejected before the SDK can load',async({page})
  expect(await page.locator('script[src*="maps.googleapis.com"]').count()).toBe(0);
 });
 
-test('configured Google route credential does not change independent Leaflet customer pinning',async({page})=>{
- await page.setContent('<form><input name="latitude"><input name="longitude"><div id="buyer-map" style="width:350px;height:350px"></div><p id="map-selection-status"></p></form>');
+test('configured Google route credential does not change independent non-buyer Leaflet pinning',async({page})=>{
+ await page.setContent('<form><input name="latitude"><input name="longitude"><div data-pin-map style="width:350px;height:350px"></div><p data-pin-status></p></form>');
  await page.addScriptTag({path:path.resolve('node_modules/leaflet/dist/leaflet.js')});
- await configured(page);await page.evaluate(()=>LannPyaCustomerMap.mount(document.querySelector('form')));
+ await configured(page);await page.evaluate(()=>LannPyaCustomerMap.mount());
  await expect(page.locator('.leaflet-container')).toBeVisible();
  expect(await page.locator('script[src*="maps.googleapis.com"]').count()).toBe(0);
 });

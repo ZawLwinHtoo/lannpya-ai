@@ -1,7 +1,8 @@
 // A view adapter for the MTT Signboard. SQLAlchemy records remain authoritative.
 import {LocalWorkspaceApi} from './local-api.mjs';
 const copy=x=>structuredClone(x);
-const point=(a,b)=>a!=null&&b!=null&&Number.isFinite(Number(a))&&Number.isFinite(Number(b))?{lat:Number(a),lng:Number(b)}:null;
+const point=(a,b)=>a!=null&&b!=null&&String(a).trim()!==''&&String(b).trim()!==''&&Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&Math.abs(Number(a))<=90&&Math.abs(Number(b))<=180?{lat:Number(a),lng:Number(b)}:null;
+const suggestedPoint=d=>d.geocoding?.suggestion&&Date.parse(d.geocoding.suggestion.expires_at)>Date.now()?point(d.geocoding.suggestion.latitude,d.geocoding.suggestion.longitude):null;
 const states={DRAFT:'held',NEEDS_REVIEW:'held',AWAITING_CONFIRMATION:'awaiting_customer',CONFIRMED:'ready',READY_FOR_DISPATCH:'ready',ASSIGNED:'assigned',OUT_FOR_DELIVERY:'out_for_delivery',DELIVERED:'delivered',FAILED:'return_pending',CANCELLED:'cancelled'};
 export function projectOrder(row){
   const p=row.parsing_metadata?.parcel||{},pin=point(row.latitude,row.longitude);
@@ -23,7 +24,11 @@ export async function createLiveStore(W,{api=new LocalWorkspaceApi(),origin=loca
   async function connect(side,id){if(!api.connections[side]||id&&api.connections[side].actor.id!==id)await api.connect(side,origin,id||'');}
   async function loadBuyer(token){
     if(activeBuyer!==token){api.openBuyer(origin,token);activeBuyer=token;}
-    try{const card=await api.buyer.card();const prior=buyerStates.get(token);buyerStates.set(token,{...prior,card,status:card.state==='LOCKED'?'locked':'active',available:card.state!=='LOCKED'});}
+    try{const card=await api.buyer.card();const prior=buyerStates.get(token);const buyer={...prior,card,status:card.state==='LOCKED'?'locked':'active',available:card.state!=='LOCKED'};buyerStates.set(token,buyer);
+      // Reuse server-bound buyer authorization on revisit; never fetch private orders.
+      if(card.state==='LOCKED'){delete buyer.details;delete buyer.confirmation;}
+      else if(api.buyer.details){try{buyer.details=await api.buyer.details();}catch(e){delete buyer.details;delete buyer.confirmation;if(![401,403].includes(e.status))throw e;}}
+    }
     catch(e){buyerStates.set(token,{available:false,status:e.code||'unavailable'});throw e;}
   }
   async function sync(target=lastRoute){
@@ -129,7 +134,7 @@ export async function createLiveStore(W,{api=new LocalWorkspaceApi(),origin=loca
     linkStatus:id=>links.has(id)?Date.now()<links.get(id).expires?'active':'expired':linkStates.get(id)||'not_loaded',
     queue:actor=>actor.id===api.connections.rider?.actor.id?copy(queueRows.map(q=>state.orders.find(o=>o.id===q.order_id)).filter(Boolean)):[],
     closeoutBlockers:id=>routeRows.get(id)?.blockers||[],
-    customer:token=>{const b=buyerStates.get(token);if(!b)return {available:false,status:'unavailable'};const d=b.details;const o=d?{id:d.order_reference,version:1,state:states[d.status],street:d.street||'',landmark:d.landmark||'',pin:point(d.latitude,d.longitude),anchor:null,location:d.initial_pin_requires_review?'unknown':'buyer_selected',time:d.delivery_time_window||W.ANY_TIME,note:d.delivery_instructions||'',date:W.day(Date.now()),confirmation:b.confirmation||null}:{};return {...b,order:o,verified:!!d,state:states[b.card?.delivery_status],sender:b.card?.shop_display_name||'LannPya',reference:b.card?.order_reference,item:'Delivery confirmation',payment:'unknown',expected:null,remaining:'up to 3',editable:!!d&&!['DELIVERED','CANCELLED','OUT_FOR_DELIVERY','ASSIGNED'].includes(d.status),dates:[W.day(Date.now()),W.addDays(W.day(Date.now()),1),W.addDays(W.day(Date.now()),2)]};},
+    customer:token=>{const b=buyerStates.get(token);if(!b)return {available:false,status:'unavailable'};const d=b.details;const o=d?{id:d.order_reference,version:1,state:states[d.status],areaId:d.township||'',street:d.street||'',landmark:d.landmark||'',floor:d.building_floor_unit||[d.building,d.floor,d.unit].filter(Boolean).join(', '),pin:point(d.pending_location?.latitude,d.pending_location?.longitude)||point(d.latitude,d.longitude)||suggestedPoint(d),geocoding:d.geocoding,anchor:null,location:d.pending_location?'pending_review':point(d.latitude,d.longitude)?d.coordinate_source==='buyer_confirmation'?'buyer_selected':'existing_unverified':suggestedPoint(d)?'geocoded_suggestion':'unknown',time:d.delivery_time_window||W.ANY_TIME,note:d.delivery_instructions||'',date:W.day(Date.now()),confirmation:b.confirmation||null}:{};return {...b,order:o,verified:!!d,state:states[b.card?.delivery_status],sender:b.card?.shop_display_name||'LannPya',reference:b.card?.order_reference,item:'Delivery confirmation',payment:'unknown',expected:null,remaining:'up to 3',editable:!!d&&!['DELIVERED','CANCELLED','OUT_FOR_DELIVERY','ASSIGNED'].includes(d.status),dates:[W.day(Date.now()),W.addDays(W.day(Date.now()),1),W.addDays(W.day(Date.now()),2)]};},
     async verify(token,digits){await loadBuyer(token);try{await api.buyer.verify(digits);buyerStates.get(token).details=await api.buyer.details();return store.customer(token);}catch(e){await loadBuyer(token).catch(()=>{});throw e;}},
     async confirm(token,p){
       if(!p.pin||!Number.isFinite(p.pin.lat)||!Number.isFinite(p.pin.lng))throw Error('Select a valid map pin first.');

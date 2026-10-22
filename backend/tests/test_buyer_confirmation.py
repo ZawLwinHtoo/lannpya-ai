@@ -975,3 +975,144 @@ def test_migration_preserves_phase4_records(tmp_path):
         assert session.scalar(select(DeliveryEvent)).event_metadata == {"existing": True}
         assert session.get(User, merchant_id).name == "Existing"
     database.dispose()
+
+
+@pytest.mark.parametrize("coordinates", [None, ("16.8100000", "96.1100000"), ("0", "0")])
+def test_buyer_map_details_prefill_existing_coordinates_without_mutation(linked, coordinates):
+    if coordinates:
+        response = linked["client"].patch(
+            f"/api/orders/{linked['order']['id']}",
+            headers=ADMIN,
+            json={
+                "expected_version": saved(linked)["version"],
+                "latitude": coordinates[0],
+                "longitude": coordinates[1],
+                "floor": "Test floor 3",
+            },
+        )
+        assert response.status_code == 200, response.text
+    before = saved(linked)
+    auth = verified(linked)
+    result = linked["client"].get(linked["path"] + "/details", headers=auth).json()
+    assert result["township"] == "Hlaing"
+    assert result["street"] == "Private street"
+    assert result["pending_location"] is None
+    if coordinates:
+        assert Decimal(result["latitude"]) == Decimal(coordinates[0])
+        assert result["floor"] == "Test floor 3"
+        assert result["coordinate_source"] == "manual_correction"
+    else:
+        assert result["latitude"] is None and result["longitude"] is None
+    assert saved(linked)["version"] == before["version"]
+    assert "Private street" not in linked["client"].get(linked["path"]).text
+
+
+@pytest.mark.parametrize("decision", ["APPROVE", "REJECT"])
+def test_buyer_map_revisit_pending_pin_and_dispatcher_resolution(linked, decision):
+    auth = verified(linked)
+    body = pin(initial_pin_acknowledged=True)
+    response = linked["client"].patch(linked["path"] + "/location", headers=auth, json=body)
+    assert response.status_code == 200, response.text
+    details = linked["client"].get(linked["path"] + "/details", headers=auth).json()
+    assert details["latitude"] is None
+    assert details["pending_location"] == {
+        "latitude": body["latitude"],
+        "longitude": body["longitude"],
+        "status": "PENDING_REVIEW",
+    }
+    history = (
+        linked["client"]
+        .get(f"/api/orders/{linked['order']['id']}/buyer-requests", headers=ADMIN)
+        .json()
+    )
+    row = history["items"][0]
+    response = linked["client"].patch(
+        f"/api/orders/{linked['order']['id']}/buyer-requests/{row['id']}",
+        headers=ADMIN,
+        json={
+            "expected_version": saved(linked)["version"],
+            "decision": decision,
+            "reason": "Synthetic map review",
+        },
+    )
+    assert response.status_code == 200, response.text
+    details = linked["client"].get(linked["path"] + "/details", headers=auth).json()
+    assert details["pending_location"] is None
+    if decision == "APPROVE":
+        assert Decimal(details["latitude"]) == Decimal(body["latitude"])
+        assert details["coordinate_source"] == "buyer_confirmation"
+    else:
+        assert details["latitude"] is None
+    assert saved(linked)["confidence_level"] != "GREEN"
+
+
+@pytest.mark.parametrize("provider_status", [200, 403])
+def test_buyer_geocoding_is_private_cached_and_does_not_save_suggestions(
+    linked, tmp_path, provider_status
+):
+    import json
+    from pathlib import Path
+
+    import httpx2 as httpx
+    from pydantic import SecretStr
+
+    from app.services.buyer_geocoding import BuyerGeocoder
+
+    recording = json.loads(
+        (Path(__file__).parent / "fixtures/geocoding/google_yangon_v4.json").read_text()
+    )
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        return httpx.Response(provider_status, json=recording)
+
+    settings = linked["settings"].model_copy(
+        update={
+            "google_geocoding_api_key": SecretStr("fictional-geocoding-server-key"),
+            "google_maps_browser_key": "fictional-geocoding-browser-key",
+            "google_maps_browser_restrictions_confirmed": True,
+            "google_geocoding_permissions_confirmed": True,
+            "google_geocoding_external_requests_enabled": True,
+            "google_geocoding_max_requests": 1,
+            "google_geocoding_budget_directory": tmp_path / "geocoding-budget",
+        }
+    )
+    linked["app"].state.buyer_geocoder = BuyerGeocoder(
+        settings, transport=httpx.MockTransport(handle)
+    )
+    assert linked["client"].get(linked["path"] + "/details").status_code == 401
+    assert not calls
+    auth = verified(linked)
+    before = saved(linked)
+    first = linked["client"].get(linked["path"] + "/details", headers=auth)
+    assert first.status_code == 200, first.text
+    geo = first.json()["geocoding"]
+    assert geo["status"] == (
+        "SUGGESTION" if provider_status == 200 else "CREDENTIAL_OR_PERMISSION_DENIED"
+    )
+    assert geo["observation"] == "GOOGLE_MOCK"
+    assert saved(linked)["latitude"] is None and saved(linked)["version"] == before["version"]
+    assert (
+        linked["client"]
+        .get(linked["path"] + "/details", headers=auth)
+        .json()["geocoding"]["cache_hit"]
+    )
+    assert len(calls) == 1
+    assert "geocoding" not in linked["client"].get(linked["path"]).json()
+    if provider_status == 200:
+        suggestion = geo["suggestion"]
+        response = linked["client"].patch(
+            linked["path"] + "/location",
+            headers=auth,
+            json=pin(
+                latitude=str(suggestion["latitude"]),
+                longitude=str(suggestion["longitude"]),
+                initial_pin_acknowledged=True,
+            ),
+        )
+        assert response.status_code == 200 and response.json()["decision"] == "REVIEW_REQUIRED"
+        assert saved(linked)["latitude"] is None
+        details = linked["client"].get(linked["path"] + "/details", headers=auth).json()
+        assert details["geocoding"]["status"] == "PENDING_REVIEW" and details["pending_location"]
+        assert len(calls) == 1

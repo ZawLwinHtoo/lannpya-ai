@@ -59,6 +59,7 @@ def test_secure_native_storage_and_no_output(private, capsys):
 
 
 def test_cli_store_and_status_do_not_expose_dummy_or_enable_requests(private, monkeypatch, capsys):
+    monkeypatch.setenv("LANNPYA_GOOGLE_MAPS_BROWSER_RESTRICTIONS_CONFIRMED", "false")
     monkeypatch.setattr("sys.argv", ["google_browser_map", "--store-key"])
     assert cli.main() == 0
     monkeypatch.setattr("sys.argv", ["google_browser_map"])
@@ -158,6 +159,8 @@ def test_private_browser_file_is_published_only_after_restriction_confirmation(
         response = client.get("/maps-config.js")
         assert response.status_code == 200
         assert (DUMMY in response.text) == confirmed
+        assert '"buyerPinProvider": "google"' in response.text
+        assert '"pinProvider"' not in response.text  # Other maps retain their provider.
         assert "no-store" in response.headers["cache-control"]
         assert response.headers["referrer-policy"] == (
             "strict-origin-when-cross-origin" if confirmed else "no-referrer"

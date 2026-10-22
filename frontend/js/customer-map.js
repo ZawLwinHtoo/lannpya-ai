@@ -1,6 +1,6 @@
 // Delivery-point maps for dispatcher, buyer and rider.
 // Google route views require a separately restricted browser key, served as /maps-config.js.
-// Customer pinning stays on independent Leaflet; no tile request occurs until asked.
+// Buyer confirmation uses Google; other Leaflet maps and route-provider boundaries stay independent.
 (()=>{
   const YANGON={lat:16.8,lng:96.15};
   const valid=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a)<=90&&Math.abs(b)<=180;
@@ -29,45 +29,70 @@
   function destroy(){while(mounted.length)mounted.pop()();}
 
   // Editable pin bound to a form's latitude/longitude fields.
-  async function picker(form,{node,search,status,note}){
+  async function picker(form,{node,search,status,note,provider}){
     if(!node)return;
     const latitude=form.querySelector('[name=latitude]'),longitude=form.querySelector('[name=longitude]');
     const current=()=>latitude.value!==''&&longitude.value!==''&&valid(Number(latitude.value),Number(longitude.value))?{lat:Number(latitude.value),lng:Number(longitude.value)}:null;
     const say=(a,b)=>{if(status)status.textContent=`Pinned at ${a.toFixed(6)}, ${b.toFixed(6)}. ${note}`;};
     const set=(a,b)=>{if(!valid(a,b))return;latitude.value=a.toFixed(7);longitude.value=b.toFixed(7);say(a,b);latitude.dispatchEvent(new Event('input',{bubbles:true}));};
-    // Customer pinning remains independent Leaflet even when a route-view browser key exists.
-    const g=globalThis.LANNPYA_MAPS?.pinProvider==='google'?await loadGoogle():null;
+    const googleOnly=provider==='google';
+    const googleRequested=googleOnly||globalThis.LANNPYA_MAPS?.pinProvider==='google';
+    const unavailable=()=>{if(form.dataset.pinSource==='geocoded_suggestion'){latitude.value='';longitude.value='';latitude.dispatchEvent(new Event('input',{bubbles:true}));const hint=form.querySelector('[data-location-prefill]');if(hint)hint.textContent='The suggested point is withheld because the Google map could not load. Use device location or manually enter your independently selected coordinates.';}node.textContent='Google map unavailable. A separately restricted Maps JavaScript credential must authorize this local origin. Use device location or enter coordinates manually; no pin has been inferred.';if(status)status.textContent=current()?'Existing coordinates retained. Confirm or correct them before submitting.':'No delivery point selected. Google map setup is required for map selection.';};
+    if(googleOnly){
+      node.dataset.mapProvider='google';node.textContent='Loading Google map...';
+      form.querySelectorAll('[data-load-tiles],#load-street-tiles,[data-osm-note]').forEach(n=>n.hidden=true);
+    }
+    const g=googleRequested?await loadGoogle():null;
     if(!form.isConnected)return;
     if(g){
       const start=current();
-      const map=new g.Map(node,{center:start||YANGON,zoom:start?17:12,mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false});
-      const marker=new g.Marker({map,position:start,draggable:true,title:'Delivery point'});
-      const place=(p,zoom)=>{marker.setPosition(p);map.panTo(p);if(zoom)map.setZoom(17);set(p.lat(),p.lng());};
-      map.addListener('click',e=>place(e.latLng));
-      marker.addListener('dragend',()=>place(marker.getPosition()));
-      const off=new AbortController(),cleanup=[()=>off.abort(),()=>g.event.clearInstanceListeners(map),()=>g.event.clearInstanceListeners(marker),()=>marker.setMap(null)];
-      if(search){
-        if(g.places?.PlaceAutocompleteElement){
-          // Current Places widget; legacy Autocomplete is unavailable to new API projects.
-          const el=new g.places.PlaceAutocompleteElement({includedRegionCodes:['mm']});
-          el.className='pin-autocomplete';search.hidden=true;search.after(el);
-          el.addEventListener('gmp-select',async({placePrediction})=>{const p=placePrediction.toPlace();await p.fetchFields({fields:['location']});if(p.location)place(p.location,true);},{signal:off.signal});
-          cleanup.push(()=>el.remove(),()=>{search.hidden=false;});
-        }else if(g.places?.Autocomplete){
-          const ac=new g.places.Autocomplete(search,{componentRestrictions:{country:'mm'},fields:['geometry']});
-          ac.addListener('place_changed',()=>{const loc=ac.getPlace()?.geometry?.location;if(loc)place(loc,true);});
-          search.addEventListener('keydown',e=>{if(e.key==='Enter')e.preventDefault();},{signal:off.signal});
-          cleanup.push(()=>g.event.clearInstanceListeners(ac),()=>document.querySelectorAll('.pac-container').forEach(n=>n.remove()));
-        }else search.closest('label')?.setAttribute('hidden','');
-      }
-      const sync=()=>{const p=current();if(p){marker.setPosition(p);map.panTo(p);}};
-      for(const f of [latitude,longitude]){f.addEventListener('input',()=>{const p=current();if(p)say(p.lat,p.lng);},{signal:off.signal});f.addEventListener('change',sync,{signal:off.signal});}
-      if(start)say(start.lat,start.lng);
-      // Google mode needs no OpenStreetMap button or notice.
-      form.querySelectorAll('[data-load-tiles],#load-street-tiles,[data-osm-note]').forEach(n=>n.hidden=true);
-      mounted.push(()=>{cleanup.forEach(f=>f());node.replaceChildren();});
+      let map,marker,markerKind='legacy',dragEnd;
+      const extraCleanups=[];
+      const off=new AbortController();
+      const cleanup=()=>{off.abort();for(const release of extraCleanups)release();if(map)g.event.clearInstanceListeners(map);if(marker){if(markerKind==='advanced'){if(dragEnd)marker.removeEventListener('gmp-dragend',dragEnd);marker.map=null;}else{g.event.clearInstanceListeners(marker);marker.setMap(null);}}node.replaceChildren();};
+      try{
+        const markerLibrary=await g.importLibrary('marker');
+        const AdvancedMarker=markerLibrary.AdvancedMarkerElement;
+        const LegacyMarker=markerLibrary.Marker||g.Marker;
+        if(typeof AdvancedMarker!=='function'&&typeof LegacyMarker!=='function')throw new Error('Google marker library unavailable');
+        map=new g.Map(node,{center:start||YANGON,zoom:start?17:12,...(AdvancedMarker?{mapId:globalThis.LANNPYA_MAPS?.mapId||'DEMO_MAP_ID'}:{}),mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false});
+        node.dataset.mapProvider='google';
+        if(AdvancedMarker){
+          markerKind='advanced';
+          const pin=typeof markerLibrary.PinElement==='function'?new markerLibrary.PinElement({background:'#d93c34',borderColor:'#a72d27',glyphColor:'#fff'}):null;
+          marker=new AdvancedMarker({map:start?map:null,position:start||undefined,gmpDraggable:true,title:'Drag delivery pin',...(pin?{content:pin.element}:{})});
+        }else marker=new LegacyMarker({map:start?map:null,position:start||undefined,draggable:true,title:'Drag delivery pin'});
+        const place=p=>{const a=typeof p?.lat==='function'?p.lat():p?.lat,b=typeof p?.lng==='function'?p.lng():p?.lng;if(!valid(a,b))return;const point={lat:a,lng:b};if(markerKind==='advanced'){marker.position=point;marker.map=map;}else{marker.setPosition(point);marker.setMap(map);}map.panTo(point);map.setZoom(17);set(a,b);};
+        map.addListener('click',e=>place(e.latLng));
+        if(markerKind==='advanced'){dragEnd=()=>place(marker.position);marker.addEventListener('gmp-dragend',dragEnd);}
+        else marker.addListener('dragend',()=>place(marker.getPosition()));
+        // Retain existing optional search behavior on non-buyer forms only.
+        if(search&&!googleOnly){
+          if(g.places?.PlaceAutocompleteElement){
+            // Current Places widget; legacy Autocomplete is unavailable to new API projects.
+            const el=new g.places.PlaceAutocompleteElement({includedRegionCodes:['mm']});
+            el.className='pin-autocomplete';search.hidden=true;search.after(el);
+            el.addEventListener('gmp-select',async({placePrediction})=>{const p=placePrediction.toPlace();await p.fetchFields({fields:['location']});if(p.location)place(p.location,true);},{signal:off.signal});
+            extraCleanups.push(()=>el.remove(),()=>{search.hidden=false;});
+          }else if(g.places?.Autocomplete){
+            const ac=new g.places.Autocomplete(search,{componentRestrictions:{country:'mm'},fields:['geometry']});
+            ac.addListener('place_changed',()=>{const loc=ac.getPlace()?.geometry?.location;if(loc)place(loc,true);});
+            search.addEventListener('keydown',e=>{if(e.key==='Enter')e.preventDefault();},{signal:off.signal});
+            extraCleanups.push(()=>g.event.clearInstanceListeners(ac),()=>document.querySelectorAll('.pac-container').forEach(n=>n.remove()));
+          }else search.closest('label')?.setAttribute('hidden','');
+        }
+        const sync=()=>{const p=current();if(p){if(markerKind==='advanced'){marker.position=p;marker.map=map;}else{marker.setPosition(p);marker.setMap(map);}map.panTo(p);say(p.lat,p.lng);}else{if(markerKind==='advanced')marker.map=null;else marker.setMap(null);if(status)status.textContent='No delivery point selected.';}};
+        for(const f of [latitude,longitude])f.addEventListener('change',sync,{signal:off.signal});
+        globalThis.addEventListener('lannpya-google-auth-failure',()=>{cleanup();unavailable();},{signal:off.signal});
+        if(start)say(start.lat,start.lng);
+        // No implicit Places/Geocoder calls: Maps JavaScript permission is insufficient.
+        if(googleOnly)search?.closest('label')?.setAttribute('hidden','');
+        form.querySelectorAll('[data-load-tiles],#load-street-tiles,[data-osm-note]').forEach(n=>n.hidden=true);
+        mounted.push(cleanup);
+      }catch{cleanup();unavailable();}
       return;
     }
+    if(googleOnly){unavailable();return;}
     search?.closest('label')?.setAttribute('hidden','');
     if(!globalThis.L){node.textContent='Map library unavailable. Type coordinates manually or contact the shop.';return;}
     const start=current();
@@ -114,7 +139,7 @@
   }
 
   function mount(buyerForm){
-    if(buyerForm)picker(buyerForm,{node:buyerForm.querySelector('#buyer-map'),status:buyerForm.querySelector('#map-selection-status'),note:'Submit for server validation and dispatcher review.'});
+    if(buyerForm)picker(buyerForm,{node:buyerForm.querySelector('#buyer-map'),status:buyerForm.querySelector('#map-selection-status'),note:'Submit for server validation and dispatcher review.',provider:globalThis.LANNPYA_MAPS?.buyerPinProvider||'google'});
     document.querySelectorAll('form [data-pin-map]').forEach(node=>{const form=node.closest('form');picker(form,{node,search:form.querySelector('[data-pin-search]'),status:form.querySelector('[data-pin-status]'),note:node.dataset.pinNote||'Save to send this point to the rider and buyer.'});});
     document.querySelectorAll('[data-view-map]').forEach(view);
   }
