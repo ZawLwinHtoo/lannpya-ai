@@ -50,9 +50,10 @@ async function jsonRequest(base, path, headers, { method = "GET", body, signal }
 
 export function createDevelopmentApi({ baseUrl, token }) {
   const base = apiBase(baseUrl, true);
-  if (typeof token !== "string" || token.length < 32) throw new Error("Enter a private local development token at runtime");
+  const cleanToken = typeof token === "string" ? token.trim() : "";
+  if (cleanToken.length < 32) throw new Error("Enter a private local development token at runtime");
   return (path, options) => jsonRequest(base, path,
-    path === "/health" || path.split("?")[0] === "/api/orders/parse" ? {} : { "X-Dev-Access-Token": token }, options);
+    path === "/health" || path.split("?")[0] === "/api/orders/parse" ? {} : { "X-Dev-Access-Token": cleanToken }, options);
 }
 
 export function createBuyerApi({ baseUrl, linkToken }) {

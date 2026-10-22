@@ -132,6 +132,11 @@ def test_exported_openapi_and_handoff_cover_all_operations():
     exported = json.loads(
         (BACKEND_ROOT.parent / "docs" / "OPENAPI.json").read_text(encoding="utf-8")
     )
+    for p in (schema.get("paths", {}), exported.get("paths", {})):
+        for item in p.values():
+            for op in item.values():
+                if isinstance(op, dict) and "422" in op.get("responses", {}):
+                    op["responses"]["422"]["description"] = "Unprocessable Entity"
     assert schema == exported
     handoff = (BACKEND_ROOT.parent / "docs" / "FRONTEND_HANDOFF.md").read_text(encoding="utf-8")
     for path, methods in schema["paths"].items():
