@@ -16,6 +16,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.core.config import Settings
+from app.routing.base import RoutingFailure
+from app.routing.browser_credentials import load_browser_key
+from app.routing.credentials import load_ors_key
+from app.services.google_estimates import key_for as google_server_key_for
 from tools.backend_test_dashboard.runtime import Sandbox
 
 STATIC = Path(__file__).parent / "static"
@@ -123,10 +127,29 @@ logger = logging.getLogger(__name__)
 
 def create_dashboard(origin="http://127.0.0.1:8765", *, sandbox_factory=Sandbox, frontend=None):
     try:
-        maps_key = Settings().google_maps_browser_key
+        map_settings = Settings()
+        browser_key = (
+            load_browser_key(map_settings)
+            if map_settings.google_maps_browser_restrictions_confirmed
+            else None
+        )
+        maps_key = browser_key.get_secret_value() if browser_key else None
+        if maps_key:
+            # Include private-file fallbacks, not only native environment settings.
+            private_keys = (google_server_key_for(map_settings), load_ors_key(map_settings))
+            if any(
+                key
+                and key.get_secret_value().strip()
+                and key.get_secret_value().strip() in maps_key
+                for key in private_keys
+            ):
+                maps_key = None
     except ValidationError as exc:
         maps_key = None
         logger.warning("Google Maps disabled: backend settings are invalid (%s)", exc.error_count())
+    except (RoutingFailure, OSError):
+        maps_key = None
+        logger.warning("Google Maps disabled: private routing credential check unavailable")
     # Google Maps JS hosts, per Google's CSP guidance; opened only when a key is configured.
     google = (
         " https://*.googleapis.com https://*.gstatic.com https://*.google.com"
@@ -208,7 +231,9 @@ def create_dashboard(origin="http://127.0.0.1:8765", *, sandbox_factory=Sandbox,
         response.headers.update(
             {
                 "Cache-Control": "no-store",
-                "Referrer-Policy": "no-referrer",
+                # Google website-restricted browser keys require an origin referrer.
+                # Cross-origin requests reveal only the origin, never buyer capability paths.
+                "Referrer-Policy": "strict-origin-when-cross-origin" if maps_key else "no-referrer",
                 "X-Content-Type-Options": "nosniff",
                 "X-Frame-Options": "DENY",
                 "Content-Security-Policy": (

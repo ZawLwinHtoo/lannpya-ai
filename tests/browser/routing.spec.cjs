@@ -1,4 +1,4 @@
-const {test,expect,inspect}=require('./fixtures.cjs');
+const {test,expect,inspect,saveManual,openDraftRoute}=require('./fixtures.cjs');
 const fs=require('node:fs');
 const path=require('node:path');
 test.beforeEach(async({page})=>{await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({status:200,contentType:'text/css',body:''}));});
@@ -7,12 +7,12 @@ async function order(page,name,coordinates=true){
   for(const [k,v]of Object.entries({name,phone:'09790000000',item:'Fictional routing parcel',street:'Synthetic test street',landmark:'စမ်းသပ် ဂိတ်',expected:'25000'}))await f.locator(`[name=${k}]`).fill(v);
   await f.locator('[name=areaId]').selectOption('Hlaing');await f.locator('[name=received]').check();
   if(coordinates){await f.getByText('Known map coordinates (optional)',{exact:true}).click();await f.locator('[name=lat]').fill('16.81');await f.locator('[name=lng]').fill('96.11');await f.locator('[name=locationReviewed]').check();}
-  await f.locator('button').last().click();await expect(page.locator('#edit-form')).toBeVisible();
+  await saveManual(page,f);
   const id=new URL(page.url()).hash.split('/').at(-1);
   if(coordinates){
     await page.locator('[data-action=issue]').click();const link=page.getByRole('link',{name:'See what the buyer sees'});await expect(link).toBeVisible();const href=await link.getAttribute('href');
     await page.goto('/'+href);await expect(page.locator('#verify-form')).toBeVisible();await page.locator('[name=digits]').fill('0000');await page.locator('#verify-form button').click();
-    await expect(page.locator('#customer-form')).toBeVisible();await page.locator('[name=latitude]').fill('16.81');await page.locator('[name=longitude]').fill('96.11');await page.locator('[name=initial_pin_acknowledged]').check();await page.locator('#customer-form .customer-primary').click();await expect(page.locator('.live-notice').filter({hasText:'persisted'})).toBeVisible();
+    await expect(page.locator('#customer-form')).toBeVisible();await page.locator('[name=latitude]').fill('16.81');await page.locator('[name=longitude]').fill('96.11');await page.locator('[name=initial_pin_acknowledged]').check();await page.locator('#customer-form .customer-primary').click();await expect(page.locator('.delivery-request-confirmed')).toBeVisible();
     await page.goto('/#/order/'+id);await expect(page.locator('#edit-form')).toBeVisible();
     if(await page.locator('[data-action=approve-location]').count()){await page.locator('[data-action=approve-location]').click();await page.locator('dialog [name=reason]').fill('Synthetic buyer point review; independent accuracy unknown');await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);}
     while(await page.locator('[data-review-request]').count()){await page.locator('[data-review-request]').first().click();await page.locator('dialog [name=reason]').fill('Synthetic availability review');await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);}
@@ -36,17 +36,17 @@ test('routing preview, explicit commit, map geometry, rider COD and safe remaini
   expect((await inspect(page,'/api/orders/'+second)).status).not.toBe('ASSIGNED');
   await shot(page,'dispatcher-preview-desktop');
   const c=page.locator('#commit-routing-plan');await c.locator('[name=ack]').check();await c.locator('[name=simulation]').check();await c.locator('[type=submit]').click();
-  await expect(page.locator('[data-action=dispatch-route]')).toBeVisible();
+  await expect(page.locator('a.route-tile')).toBeVisible();
   const plans=await inspect(page,'/api/routes/plans');expect(plans.items[0].state).toBe('COMMITTED');expect(plans.items[0].stale).toBe(false);
   await page.reload();await expect(page.locator('[data-open-plan]')).toHaveCount(1);
   await page.locator('[data-open-plan]').click();await expect(page.locator('#routing-preview')).toContainText('COMMITTED');
-  await page.locator('[data-action=dispatch-route]').click();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
+  await openDraftRoute(page);await page.locator('[data-action=dispatch-route]').click();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   await page.goto('/#/ride');await expect(page.locator('body')).toContainText('Assigned route plan');
   await expect(page.locator('.google-road-estimate')).toContainText('Live Google requests disabled');
   await expect(page.locator('.google-road-estimate button[type=submit]')).toBeDisabled();
   await expect(page.locator('[data-plan-map].leaflet-container')).toHaveCount(1);
   await expect(page.locator('a[href*="google.com/maps/dir"]')).toBeVisible();
-  await page.locator('[data-action=delivered]').click();await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
+  await page.locator('[data-action=delivered]').click();await page.locator('dialog [name=amount]').fill('25000');await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   const all=await inspect(page,'/api/orders');expect(all.items.filter(o=>o.status==='DELIVERED')).toHaveLength(1);
   await plan(page);await expect(page.locator('#routing-preview')).toContainText('Stop 1');
   const re=page.locator('#commit-routing-plan');await re.locator('[name=ack]').check();await re.locator('[name=simulation]').check();await re.locator('[type=submit]').click();
@@ -58,7 +58,7 @@ test('routing preview, explicit commit, map geometry, rider COD and safe remaini
 
 test('saved preview becomes stale after a real order correction and cannot be committed',async({page})=>{
   const id=await order(page,'Fictional Stale Buyer');await plan(page);
-  await page.goto('/#/order/'+id);await page.locator('#edit-form [name=landmark]').fill('Synthetic corrected gate');await page.locator('#edit-form button').last().click();
+  await page.goto('/#/order/'+id);await page.locator('#edit-form [name=landmark]').fill('Synthetic corrected gate');await page.locator('button[form=edit-form]').click();
   await page.goto('/#/routes');await expect(page.locator('[data-open-plan]')).toHaveCount(1);await page.locator('[data-open-plan]').click();
   await expect(page.locator('#routing-preview')).toContainText('STALE');await expect(page.locator('#commit-routing-plan')).toHaveCount(0);
   expect((await inspect(page,'/api/orders/'+id)).status).not.toBe('ASSIGNED');

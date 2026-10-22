@@ -22,6 +22,8 @@ def optimize(query, matrix, stops, available_riders):
             unassigned=[{"order_id": s["order_id"], "reason": "NO_AVAILABLE_RIDER"} for s in stops],
             warnings=matrix.warnings,
             attribution=matrix.attribution,
+            matrix_observation=matrix.observation,
+            travel_profile=matrix.profile,
         )
     n, v = len(stops) + 1, len(riders)
     horizon = int((query.operating_window.end - query.operating_window.start).total_seconds())
@@ -161,6 +163,8 @@ def optimize(query, matrix, stops, available_riders):
         vehicles=vehicles,
         unassigned=unassigned,
         attribution=matrix.attribution,
+        matrix_observation=matrix.observation,
+        travel_profile=matrix.profile,
         warnings=[
             *matrix.warnings,
             "Bounded heuristic solution; global optimality is not guaranteed.",

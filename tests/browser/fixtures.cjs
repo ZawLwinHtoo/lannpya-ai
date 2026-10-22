@@ -9,13 +9,39 @@ const {pythonPath,root}=require('../../scripts/python_path.cjs');
 const shots=path.join(root,'docs/visual-testing/screenshots');
 const sanitize=s=>String(s).replace(/[A-Za-z0-9_-]{43,}/g,'[redacted]').replace(/\/confirm\/[^/?\s]+/g,'/confirm/[redacted]');
 const test=base.extend({
-  app:async({},use,testInfo)=>{
+  orsMock:[false,{option:true}],
+  googleBrowser:[false,{option:true}],
+  app:async({orsMock,googleBrowser},use,testInfo)=>{
     const probe=net.createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');
     const port=probe.address().port;await new Promise(r=>probe.close(r));
     const origin=`http://127.0.0.1:${port}`;
-    const child=spawn(pythonPath(),['-m','tools.integrated_workspace','--port',String(port),'--temporary'],{
+    const mockCode=`import json, os, tempfile
+from pathlib import Path
+import httpx2 as httpx
+from app.routing.http import HTTPProvider
+from tools.integrated_workspace import main
+original = HTTPProvider.__init__
+def handle(request):
+    assert str(request.url) == 'https://api.heigit.org/openrouteservice/v2/matrix/driving-car'
+    recording_path = os.environ.get('LANNPYA_ORS_TEST_RECORDING')
+    if recording_path:
+        recording = json.loads(Path(recording_path).read_text(encoding='utf-8'))
+        assert json.loads(request.content)['locations'] == recording['locations']
+        return httpx.Response(200, json={k: recording[k] for k in ('distances', 'durations')})
+    n = len(json.loads(request.content)['locations'])
+    return httpx.Response(200, json={'distances': [[0 if i == j else 1000+i*100+j for j in range(n)] for i in range(n)], 'durations': [[0 if i == j else 60+i*10+j for j in range(n)] for i in range(n)]})
+def initialize(self, settings, *, transport=None):
+    assert settings.routing_provider == 'ors'
+    original(self, settings, transport=httpx.MockTransport(handle))
+HTTPProvider.__init__ = initialize
+with tempfile.TemporaryDirectory(prefix='lannpya-ors-browser-budget-') as ledger:
+    os.environ['LANNPYA_ORS_BUDGET_DIRECTORY'] = ledger
+    main()
+`;
+    const argv=orsMock?['-c',mockCode,'--port',String(port),'--temporary']:['-m','tools.integrated_workspace','--port',String(port),'--temporary'];
+    const child=spawn(pythonPath(),argv,{
       cwd:path.join(root,'backend'),stdio:['ignore','ignore','pipe'],windowsHide:true,
-      env:{...process.env,LANNPYA_ENVIRONMENT:'test',LANNPYA_ROUTING_PROVIDER:'offline',LANNPYA_ROUTING_EXTERNAL_REQUESTS_ENABLED:'false',LANNPYA_GOOGLE_DEMO_ENABLED:'false',LANNPYA_GOOGLE_DEMO_MAX_REQUESTS:'0',LANNPYA_GOOGLE_MAPS_BROWSER_KEY:''},
+      env:{...process.env,LANNPYA_ORS_TEST_RECORDING:orsMock==='phase36'?path.join(root,'backend/tests/fixtures/routing/ors_yangon_phase36.json'):'',LANNPYA_ENVIRONMENT:'test',LANNPYA_ROUTING_PROVIDER:orsMock?'ors':'offline',LANNPYA_ROUTING_EXTERNAL_REQUESTS_ENABLED:orsMock?'true':'false',LANNPYA_ORS_API_KEY:orsMock?'fictional-server-only-key':'',LANNPYA_ORS_MAX_REQUESTS:orsMock?'1':'0',LANNPYA_ORS_MAX_MATRIX_ELEMENTS:'16',LANNPYA_GOOGLE_DEMO_ENABLED:'false',LANNPYA_GOOGLE_DEMO_MAX_REQUESTS:'0',LANNPYA_GOOGLE_MAPS_BROWSER_KEY:googleBrowser?'fictional-browser-only-fixture':'',LANNPYA_GOOGLE_MAPS_BROWSER_RESTRICTIONS_CONFIRMED:googleBrowser?'true':'false'},
     });
     let stderr='';child.stderr.on('data',b=>{stderr+=b.toString();});
     const exited=once(child,'exit');let cookie='',csrf;
@@ -39,6 +65,15 @@ const test=base.extend({
   },
   page:async({browser,app,hasTouch},use,testInfo)=>{
     const context=await browser.newContext({baseURL:app.origin,viewport:testInfo.project.use.viewport||{width:1440,height:900},timezoneId:'Asia/Rangoon',hasTouch});
+    // Test-specific page mocks take precedence. Otherwise no remote service is contacted.
+    await context.route('**/*',route=>{
+      const url=new URL(route.request().url());
+      if(['http:','https:'].includes(url.protocol)&&url.origin!==app.origin){
+        if(url.hostname==='fonts.googleapis.com')return route.fulfill({contentType:'text/css',body:''});
+        return route.fulfill({status:503,contentType:'text/plain',body:'External network disabled in browser tests; provide an explicit fixture.'});
+      }
+      return route.continue();
+    });
     const activity=[],errors=[],network=[],starts=new WeakMap();
     context.on('page',p=>{
       p.on('pageerror',e=>errors.push(sanitize(e.message)));
@@ -125,4 +160,17 @@ async function shot(page,name){
   fs.mkdirSync(shots,{recursive:true});
   await page.screenshot({path:path.join(shots,name+'.png'),fullPage:true,mask:[page.locator('[name=generated-link]')],animations:'disabled'});
 }
-module.exports={test,expect,enter,inspect,create,link,verify,approve,assignDispatch,shot};
+// MTT keeps the new-order form open and confirms creation in its own modal.
+// Exercise that real UI rather than restoring the older automatic navigation.
+async function saveManual(page,form){
+  await form.locator('aside button').click();
+  await expect(page.locator('.created-dialog')).toBeVisible();
+  await page.locator('.created-dialog [data-created=open]').click();
+  await expect(page.locator('#edit-form')).toBeVisible();
+}
+async function openDraftRoute(page){
+  // Current MTT places departure on the route sheet, reached from its route tile.
+  if(!await page.locator('[data-action=dispatch-route]').count())await page.locator('a.route-tile').first().click();
+  await expect(page.locator('[data-action=dispatch-route]')).toBeVisible();
+}
+module.exports={test,expect,enter,inspect,create,link,verify,approve,assignDispatch,shot,saveManual,openDraftRoute};

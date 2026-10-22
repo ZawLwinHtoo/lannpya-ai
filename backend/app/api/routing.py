@@ -1,3 +1,4 @@
+from math import isqrt
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -9,7 +10,9 @@ from app.core.dev_access import require_dev_access
 from app.core.order_errors import OrderAPIError
 from app.db.routing_models import RoutingPlan
 from app.domain.lifecycle import UserRole
+from app.routing.credentials import load_ors_key
 from app.routing.factory import provider_for
+from app.routing.ors import budget_status
 from app.schemas.errors import ErrorResponse
 from app.schemas.routing import (
     GoogleEstimate,
@@ -39,6 +42,10 @@ router = APIRouter(
 
 
 def provider(request, allow_simulation):
+    if request.app.state.settings.routing_provider == "google":
+        raise OrderAPIError(
+            422, "GOOGLE_DEMO_SINGLE_ROUTE_ONLY", "Use the consented Google single-route endpoint."
+        )
     return getattr(request.app.state, "routing_provider_override", None) or provider_for(
         request.app.state.settings, allow_simulation
     )
@@ -71,14 +78,17 @@ def status(request: Request, actor: RiderActor):
         "provider": s.routing_provider,
         "external_requests_enabled": s.routing_external_requests_enabled,
         "key_configured": bool(
-            s.google_routes_api_key if s.routing_provider == "google" else s.ors_api_key
+            s.google_routes_api_key if s.routing_provider == "google" else load_ors_key(s)
         )
         if s.routing_provider in {"google", "ors"}
         else False,
         "simulation_acknowledgement_required": s.routing_provider == "offline",
-        "max_stops": s.routing_max_stops,
+        "max_stops": min(s.routing_max_stops, isqrt(s.ors_max_matrix_elements) - 1)
+        if s.routing_provider == "ors"
+        else s.routing_max_stops,
         "live_verified": False,
         "two_wheeler_enabled": s.routing_provider == "google" and s.routing_two_wheeler_enabled,
+        **(budget_status(s) if s.routing_provider == "ors" else {}),
     }
 
 

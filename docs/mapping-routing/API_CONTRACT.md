@@ -6,6 +6,21 @@ private dev credential into browser fetch code. Native API callers require the
 existing local/test `X-Dev-Access-Token` and server-bound actor. Production fails
 closed. All new paths begin `/api`.
 
+Phase 33 provider update: ORS requests use
+`https://api.heigit.org/openrouteservice/v2/matrix/driving-car` (the former host
+is deprecated). `python -m tools.ors_matrix_probe --store-key` from `backend/`
+stores a server-only key with hidden input in ignored `.env.ors.local`. This
+does not change live-call permissions or budgets. See
+[Phase 33 preparation](PHASE33_ORS_LIVE_VERIFICATION.md); the live matrix test
+still requires separate authorization. Public API routes and schemas are unchanged.
+
+Phase 37 UI: Mode B uses this same authorized preview/commit contract. It refreshes
+the local provider-status budget after each attempt, disables exhausted/unknown
+availability, and never retries automatically. `ORS_ROAD_MATRIX` means a successful
+provider observation; `ORS_MOCK_MATRIX` identifies a recorded/mocked replay.
+Matrix-only plans show independent approved stop pins on Leaflet, without a
+fabricated road polyline. See [final UI verification](PHASE37_FINAL_UI_VERIFICATION.md).
+
 | Method | Path | Authorization / effect |
 |---|---|---|
 | GET | `/routes/provider-status` | Dispatcher/admin; config booleans, no provider call |
@@ -102,3 +117,40 @@ await store.commitPlan(plan, {
 No new public paid-routing proxy, raw provider-key field or automatic assignment
 endpoint was added. Replan means POST a new optimization preview from current
 records, review it and commit separately.
+
+## Phase 32: bounded ORS road matrices
+
+Endpoint names remain unchanged. Live ORS calculate/matrix/optimize bodies require
+additive `request_id` (UUID) and literal boolean `authorize_external_request: true`.
+Offline requests do not require them. The configured server ORS budget defaults
+to zero; no request occurs on page load. One preview performs one matrix request,
+with no extra Directions requests for geometry. The default cap is 16 matrix cells
+(one origin plus three deliveries); provider status reports the effective stop cap.
+
+RoadMatrix adds profile, source/destination indices, unreachable-pair errors and
+`observation`. OptimizationResult adds `matrix_observation` and `travel_profile`.
+`quality` retains its original SIMULATED/ROAD_STATIC enum for compatibility.
+`ORS_MOCK_MATRIX` is test transport data; `ORS_ROAD_MATRIX` is reserved for a valid
+actual ORS response. Costs may be asymmetric and null pairs are unreachable.
+No ORS matrix includes route geometry. Never display invented road polylines.
+
+```javascript
+const plan = await store.previewPlan({
+  ...reviewedPlanRequest,
+  allow_simulation: false,
+  request_id: crypto.randomUUID(),
+  authorize_external_request: true
+}); // Only after owner approval and server-side key/quota configuration.
+```
+
+Keep the same UUID when observing/retrying an uncertain request: duplicate attempts
+return 409 rather than consume another HTTP request. Quota exhaustion returns 429;
+missing consent/invalid limits 422; disabled or missing credentials 503. Provider
+timeouts and malformed responses preserve existing sanitized 504/502 errors.
+Failed provider calls consume the locally reserved authorization. No automatic retry
+or simulation fallback occurs. Details: [Phase 32](PHASE32_FINAL_GOOGLE_ORS_INTEGRATION.md).
+
+Google Demo routing remains separate: use `/api/routes/google-demo` and its own
+explicit consent/budget. A configured Google provider on the general calculate,
+matrix or optimize endpoints returns 422 `GOOGLE_DEMO_SINGLE_ROUTE_ONLY`; it cannot
+bypass the single-route Demo quota or implicitly activate Compute Route Matrix.

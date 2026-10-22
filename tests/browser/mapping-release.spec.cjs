@@ -1,5 +1,5 @@
 // Complete local mapping journey at every requested viewport. Synthetic data/GPS; no live maps APIs.
-const {test,expect,inspect}=require('./fixtures.cjs');
+const {test,expect,inspect,saveManual,openDraftRoute}=require('./fixtures.cjs');
 const path=require('node:path');
 const fs=require('node:fs');
 const output=path.resolve('.tmp/mapping-release/screenshots');
@@ -14,8 +14,7 @@ for(const [width,height] of [[1440,900],[1366,768],[768,1024],[390,844],[360,740
       await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({status:200,contentType:'text/css',body:''}));
       await page.goto('/#/manual');const form=page.locator('#manual-form');await expect(form).toBeVisible();
       for(const [k,v]of Object.entries({name:'Fictional Mapping Release Buyer',phone:'09790000000',item:'Synthetic shirt',street:'စမ်းသပ်လမ်း',landmark:'Fictional test gate',expected:'25000'}))await form.locator(`[name=${k}]`).fill(v);
-      await form.locator('[name=areaId]').selectOption('Hlaing');await form.locator('[name=received]').check();await form.locator('button').last().click();
-      await expect(page.locator('#edit-form')).toBeVisible();const id=new URL(page.url()).hash.split('/').at(-1);
+      await form.locator('[name=areaId]').selectOption('Hlaing');await form.locator('[name=received]').check();await saveManual(page,form);const id=new URL(page.url()).hash.split('/').at(-1);
       await page.locator('[data-action=issue]').click();const link=page.getByRole('link',{name:'See what the buyer sees'});await expect(link).toBeVisible();
       await page.goto('/'+await link.getAttribute('href'));await expect(page.locator('#verify-form')).toBeVisible();await page.locator('[name=digits]').fill('0000');await page.locator('#verify-form button').click();
       const map=page.locator('#buyer-map');await expect(map).toBeVisible();await expect(page.locator('[name=latitude]')).toHaveValue('');
@@ -37,7 +36,7 @@ for(const [width,height] of [[1440,900],[1366,768],[768,1024],[390,844],[360,740
       await expect(page.locator('[name=longitude]')).not.toHaveValue(before);const latitude=await page.locator('[name=latitude]').inputValue();
       await noOverflow(page);await screenshot(page,`${width}-buyer-pin`);
       await page.locator('[name=initial_pin_acknowledged]').check();await page.locator('[name=note]').fill('Synthetic release doorstep note');await page.locator('#customer-form .customer-primary').click();
-      await expect(page.locator('.live-notice').filter({hasText:'persisted'})).toBeVisible();expect((await inspect(page,'/api/orders/'+id)).latitude).toBeNull();
+      await expect(page.locator('.delivery-request-confirmed')).toBeVisible();expect((await inspect(page,'/api/orders/'+id)).latitude).toBeNull();
       await page.goto('/#/order/'+id);await expect(page.locator('[data-action=approve-location]')).toBeVisible();await page.locator('[data-action=approve-location]').click();
       await page.locator('dialog [name=reason]').fill('Synthetic fixture approval; independent geospatial accuracy unknown');await noOverflow(page);await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
       while(await page.locator('[data-review-request]').count()){await page.locator('[data-review-request]').first().click();await page.locator('dialog [name=reason]').fill('Synthetic buyer availability review');await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);}
@@ -49,7 +48,7 @@ for(const [width,height] of [[1440,900],[1366,768],[768,1024],[390,844],[360,740
       expect((await inspect(page,'/api/orders/'+id)).status).not.toBe('ASSIGNED');
       await noOverflow(page);await screenshot(page,`${width}-route-preview`);
       const commit=page.locator('#commit-routing-plan');await commit.locator('[name=ack]').check();await commit.locator('[name=simulation]').check();await commit.locator('[type=submit]').click();
-      await expect(page.locator('[data-action=dispatch-route]')).toBeVisible();await page.locator('[data-action=dispatch-route]').click();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
+      await expect(page.locator('a.route-tile')).toBeVisible();await openDraftRoute(page);await page.locator('[data-action=dispatch-route]').click();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
       await page.goto('/#/ride');await expect(page.locator('body')).toContainText('Assigned route plan');await expect(page.locator('body')).toContainText('Synthetic release doorstep note');
       await expect(page.locator('.google-road-estimate button[type=submit]')).toBeDisabled();
       const navigation=page.locator('a[href*="google.com/maps/dir"]').first();await expect(navigation).toBeVisible();
@@ -57,7 +56,7 @@ for(const [width,height] of [[1440,900],[1366,768],[768,1024],[390,844],[360,740
       await page.context().route('https://www.google.com/maps/**',r=>r.fulfill({status:200,contentType:'text/html',body:'Synthetic navigation target; no Google network call'}));
       const popup=page.waitForEvent('popup');await navigation.click();const opened=await popup;await opened.waitForLoadState();expect(opened.url()).toContain('google.com/maps/dir');await opened.close();
       await noOverflow(page);await screenshot(page,`${width}-rider-route`);
-      await page.locator('[data-action=delivered]').click();await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
+      await page.locator('[data-action=delivered]').click();await page.locator('dialog [name=amount]').fill('25000');await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
       expect((await inspect(page,'/api/orders/'+id)).status).toBe('DELIVERED');
       expect((await inspect(page,'/api/orders/'+id+'/events')).items.some(e=>e.event_type==='DELIVERY_COMPLETED')).toBe(true);
       await page.goto('/#/routes');await expect(page.locator('[data-open-plan]')).toHaveCount(1);await page.locator('[data-open-plan]').click();await expect(page.locator('#routing-preview')).toContainText('STALE');

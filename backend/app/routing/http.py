@@ -10,11 +10,14 @@ from pydantic import ValidationError
 
 from app.ai.gateway import reject_constant, unique_keys
 from app.routing.base import RoadProvider, RoutingFailure
+from app.routing.credentials import load_ors_key
+from app.routing.diagnostics import provider_diagnostic
+from app.routing.endpoints import ORS_DIRECTIONS, ORS_MATRIX
 from app.schemas.routing import Geometry, RoadMatrix, RoadRoute
 
 
 def cost(value):
-    if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 100000000:
+    if type(value) not in (int, float) or not 0 <= value <= 100000000 or not math.isfinite(value):
         raise ValueError("Invalid provider cost")
     return math.ceil(value)
 
@@ -37,7 +40,7 @@ class HTTPProvider(RoadProvider):
         key = (
             self.settings.google_routes_api_key
             if self.name == "google"
-            else self.settings.ors_api_key
+            else load_ors_key(self.settings)
         )
         if not key or not key.get_secret_value().strip():
             raise RoutingFailure("ROUTING_KEY_MISSING")
@@ -70,24 +73,38 @@ class HTTPProvider(RoadProvider):
                 transport=self.transport or httpx.HTTPTransport(retries=0, trust_env=False),
             ) as client:
                 with client.stream("POST", endpoint, json=body, headers=headers) as response:
+                    diagnostic = None
+                    if response.status_code != 200:
+                        secrets = tuple(
+                            value
+                            for name, value in headers.items()
+                            if name.lower() in {"authorization", "x-goog-api-key"}
+                        )
+                        diagnostic = provider_diagnostic(response, deadline, secrets)
                     if response.status_code == 429:
-                        raise RoutingFailure("ROUTING_RATE_LIMITED", 429)
+                        raise RoutingFailure("ROUTING_RATE_LIMITED", 429, provider_error=diagnostic)
                     if response.status_code in {401, 403}:
-                        raise RoutingFailure("ROUTING_CREDENTIAL_OR_QUOTA_REJECTED")
+                        raise RoutingFailure(
+                            "ROUTING_CREDENTIAL_OR_QUOTA_REJECTED", provider_error=diagnostic
+                        )
                     if response.status_code in {400, 404}:
                         if self.name == "ors":
-                            try:
-                                data = self.read_json(response, deadline)
-                                code = data.get("error", {}).get("code")
-                            except (ValueError, TypeError, AttributeError):
-                                code = None
+                            code = diagnostic.get("provider_code")
                             if code == 2009:
-                                raise RoutingFailure("ROUTE_NOT_FOUND", 422)
+                                raise RoutingFailure(
+                                    "ROUTE_NOT_FOUND", 422, provider_error=diagnostic
+                                )
                             if code in {2010, 6010}:
-                                raise RoutingFailure("ROUTING_POINT_NOT_FOUND", 422)
-                        raise RoutingFailure("ROUTING_REQUEST_UNSUPPORTED", 422)
+                                raise RoutingFailure(
+                                    "ROUTING_POINT_NOT_FOUND", 422, provider_error=diagnostic
+                                )
+                        raise RoutingFailure(
+                            "ROUTING_REQUEST_UNSUPPORTED", 422, provider_error=diagnostic
+                        )
                     if response.status_code != 200:
-                        raise RoutingFailure("ROUTING_PROVIDER_UNAVAILABLE")
+                        raise RoutingFailure(
+                            "ROUTING_PROVIDER_UNAVAILABLE", provider_error=diagnostic
+                        )
                     return self.read_json(response, deadline)
         except httpx.TimeoutException:
             raise RoutingFailure("ROUTING_TIMEOUT", 504) from None
@@ -143,7 +160,7 @@ class HTTPProvider(RoadProvider):
                 geometry = Geometry.model_validate(route["polyline"]["geoJsonLinestring"])
             else:
                 data = self.post(
-                    "https://api.openrouteservice.org/v2/directions/driving-car/geojson",
+                    ORS_DIRECTIONS,
                     {
                         "coordinates": [
                             [p.longitude, p.latitude] for p in (request.origin, request.destination)
@@ -242,7 +259,7 @@ class HTTPProvider(RoadProvider):
                 if n * n > 3500:
                     raise RoutingFailure("ROUTING_MATRIX_LIMIT", 422)
                 data = self.post(
-                    "https://api.openrouteservice.org/v2/matrix/driving-car",
+                    ORS_MATRIX,
                     {
                         "locations": [[p.longitude, p.latitude] for p in request.locations],
                         "metrics": ["distance", "duration"],
@@ -265,6 +282,14 @@ class HTTPProvider(RoadProvider):
                 durations=durations,
                 quality="ROAD_STATIC",
                 attribution=self.attribution,
+                profile="driving-car" if self.name == "ors" else request.mode,
+                observation=(
+                    ("ORS_MOCK_MATRIX" if self.transport is not None else "ORS_ROAD_MATRIX")
+                    if self.name == "ors"
+                    else (
+                        "GOOGLE_MOCK_MATRIX" if self.transport is not None else "GOOGLE_ROAD_MATRIX"
+                    )
+                ),
                 warnings=["Static matrix; no live traffic."],
             )
         except (KeyError, IndexError, TypeError, AttributeError, ValueError, ValidationError):

@@ -1,20 +1,26 @@
 // Delivery-point maps for dispatcher, buyer and rider.
-// Google Maps is used when the backend provides a browser key (LANNPYA_GOOGLE_MAPS_BROWSER_KEY in backend/.env,
-// served as /maps-config.js). Without a key, vendored Leaflet is used and no tile request occurs until asked.
+// Google route views require a separately restricted browser key, served as /maps-config.js.
+// Customer pinning stays on independent Leaflet; no tile request occurs until asked.
 (()=>{
   const YANGON={lat:16.8,lng:96.15};
   const valid=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a)<=90&&Math.abs(b)<=180;
   const key=()=>globalThis.LANNPYA_MAPS?.googleKey||'';
   let googleReady=null;
+  let googleAuthFailed=false;
   function loadGoogle(){
+    if(googleAuthFailed)return Promise.resolve(null);
     if(!key())return Promise.resolve(null);
     if(globalThis.google?.maps?.Map)return Promise.resolve(globalThis.google.maps);
     googleReady??=new Promise(resolve=>{
-      const timer=setTimeout(()=>resolve(null),8000);
-      globalThis.__lannpyaMapsReady=()=>{clearTimeout(timer);resolve(globalThis.google?.maps||null);};
+      let settled=false;
+      const finish=maps=>{if(settled)return;settled=true;clearTimeout(timer);if(!maps){googleReady=null;s.remove();}resolve(maps);};
+      const timer=setTimeout(()=>finish(null),8000);
+      globalThis.__lannpyaMapsReady=()=>finish(globalThis.google?.maps||null);
+      globalThis.gm_authFailure=()=>{googleAuthFailed=true;finish(null);globalThis.dispatchEvent(new Event('lannpya-google-auth-failure'));};
       const s=document.createElement('script');
-      s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key())}&libraries=places&loading=async&callback=__lannpyaMapsReady`;
-      s.async=true;s.onerror=()=>{clearTimeout(timer);googleReady=null;resolve(null);};
+      s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key())}&loading=async&auth_referrer_policy=origin&callback=__lannpyaMapsReady`;
+      s.referrerPolicy='strict-origin-when-cross-origin';
+      s.async=true;s.onerror=()=>finish(null);
       document.head.append(s);
     });
     return googleReady;
@@ -29,7 +35,8 @@
     const current=()=>latitude.value!==''&&longitude.value!==''&&valid(Number(latitude.value),Number(longitude.value))?{lat:Number(latitude.value),lng:Number(longitude.value)}:null;
     const say=(a,b)=>{if(status)status.textContent=`Pinned at ${a.toFixed(6)}, ${b.toFixed(6)}. ${note}`;};
     const set=(a,b)=>{if(!valid(a,b))return;latitude.value=a.toFixed(7);longitude.value=b.toFixed(7);say(a,b);latitude.dispatchEvent(new Event('input',{bubbles:true}));};
-    const g=await loadGoogle();
+    // Customer pinning remains independent Leaflet even when a route-view browser key exists.
+    const g=globalThis.LANNPYA_MAPS?.pinProvider==='google'?await loadGoogle():null;
     if(!form.isConnected)return;
     if(g){
       const start=current();
@@ -54,7 +61,7 @@
         }else search.closest('label')?.setAttribute('hidden','');
       }
       const sync=()=>{const p=current();if(p){marker.setPosition(p);map.panTo(p);}};
-      for(const f of [latitude,longitude])f.addEventListener('change',sync,{signal:off.signal});
+      for(const f of [latitude,longitude]){f.addEventListener('input',()=>{const p=current();if(p)say(p.lat,p.lng);},{signal:off.signal});f.addEventListener('change',sync,{signal:off.signal});}
       if(start)say(start.lat,start.lng);
       // Google mode needs no OpenStreetMap button or notice.
       form.querySelectorAll('[data-load-tiles],#load-street-tiles,[data-osm-note]').forEach(n=>n.hidden=true);
@@ -71,7 +78,7 @@
     map.on('click',e=>{const p=e.latlng.wrap();place(p.lat,p.lng,true);});
     const off=new AbortController();
     const sync=()=>{const p=current();if(p){place(p.lat,p.lng,false);map.setView([p.lat,p.lng],16);}};
-    for(const f of [latitude,longitude])f.addEventListener('change',sync,{signal:off.signal});
+    for(const f of [latitude,longitude]){f.addEventListener('input',()=>{const p=current();if(p)say(p.lat,p.lng);},{signal:off.signal});f.addEventListener('change',sync,{signal:off.signal});}
     if(start)place(start.lat,start.lng,false);
     const tilesButton=form.querySelector('[data-load-tiles],#load-street-tiles');
     if(tilesButton)tilesButton.onclick=()=>{
@@ -89,7 +96,7 @@
     if(!node.dataset.lat?.trim()||!node.dataset.lng?.trim())return;
     const a=Number(node.dataset.lat),b=Number(node.dataset.lng);
     if(!valid(a,b))return;
-    const g=await loadGoogle();
+    const g=globalThis.LANNPYA_MAPS?.pinProvider==='google'?await loadGoogle():null;
     if(!node.isConnected)return;
     if(!g){
       if(!globalThis.L)return;
@@ -113,15 +120,23 @@
   }
   async function routeView(node,geometry,provider,stops=[]){
     if(!node?.isConnected||!geometry)return;
+    if(geometry.type!=='LineString'||!Array.isArray(geometry.coordinates)||geometry.coordinates.length<2||geometry.coordinates.some(p=>!Array.isArray(p)||p.length!==2||!valid(p[1],p[0]))){node.textContent='Invalid route geometry. Use the approved stop list and navigation link.';return false;}
     // Google road data is never drawn on an unrelated Leaflet basemap.
     if(provider==='google'){
+      node.textContent='Loading Google map. Route geometry will remain withheld if loading fails.';
       const g=await loadGoogle();if(!node.isConnected)return;
       if(!g){node.textContent='Google map unavailable. Route geometry is withheld; use the navigation link.';return;}
       const path=geometry.coordinates.map(([lng,lat])=>({lat,lng}));
-      const map=new g.Map(node,{center:path[0],zoom:14,mapTypeControl:false,streetViewControl:false});
-      const line=new g.Polyline({path,map,strokeColor:'#D23F2E'}),bounds=new g.LatLngBounds();path.forEach(p=>bounds.extend(p));stops.forEach(s=>bounds.extend({lat:s.latitude,lng:s.longitude}));map.fitBounds(bounds);
-      const pins=[{position:path[0],title:'Road route start'},{position:path.at(-1),title:'Road route end'},...stops.map(s=>({position:{lat:s.latitude,lng:s.longitude},title:`Approved stop ${s.sequence}; geospatial accuracy unverified`}))].map(p=>new g.Marker({...p,map}));
-      mounted.push(()=>{pins.forEach(p=>p.setMap(null));line.setMap(null);g.event.clearInstanceListeners(map);node.replaceChildren();});return;
+      let map,line,pins=[];
+      try{
+      node.replaceChildren();
+      map=new g.Map(node,{center:path[0],zoom:14,mapTypeControl:false,streetViewControl:false,gestureHandling:'cooperative'});
+      line=new g.Polyline({path,map,strokeColor:'#D23F2E'});const bounds=new g.LatLngBounds();path.forEach(p=>bounds.extend(p));stops.filter(s=>valid(s.latitude,s.longitude)).forEach(s=>bounds.extend({lat:s.latitude,lng:s.longitude}));map.fitBounds(bounds);
+      pins=[{position:path[0],title:'Road route start'},{position:path.at(-1),title:'Road route end'},...stops.filter(s=>valid(s.latitude,s.longitude)).map(s=>({position:{lat:s.latitude,lng:s.longitude},title:`Approved stop ${s.sequence}; geospatial accuracy unverified`}))].map(p=>new g.Marker({...p,map}));
+      }catch{pins.forEach(p=>p.setMap(null));line?.setMap(null);if(map)g.event.clearInstanceListeners(map);node.textContent='Google map could not render. Geometry is withheld; use the navigation link.';return false;}
+      const denied=()=>{pins.forEach(p=>p.setMap(null));line.setMap(null);node.textContent='Google map authorization failed. Geometry is withheld; use the navigation link.';};
+      globalThis.addEventListener('lannpya-google-auth-failure',denied,{once:true});
+      mounted.push(()=>{globalThis.removeEventListener('lannpya-google-auth-failure',denied);pins.forEach(p=>p.setMap(null));line.setMap(null);g.event.clearInstanceListeners(map);node.replaceChildren();});return true;
     }
     if(!globalThis.L){node.textContent='Map library unavailable. The ordered stop list remains available.';return;}
     const map=L.map(node),line=L.geoJSON(geometry,{style:{color:'#D23F2E',weight:4}}).addTo(map);
@@ -129,6 +144,20 @@
     map.fitBounds(line.getBounds(),{padding:[20,20],maxZoom:17});
     const button=document.createElement('button');button.type='button';button.className='btn sm';button.textContent='Load street tiles (OpenStreetMap)';node.after(button);
     button.onclick=()=>{const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',referrerPolicy:'origin'}).addTo(map);tiles.on('tileerror',()=>button.textContent='Tiles unavailable; route geometry remains visible.');button.disabled=true;};
+    mounted.push(()=>{map.remove();button.remove();});
+  }
+  // Independent approved coordinates only. A matrix does not contain road geometry.
+  function stopsView(node,stops,origin){
+    if(!node?.isConnected)return;
+    if(!globalThis.L){node.textContent='Map unavailable; the persisted ordered stop list remains available.';return;}
+    const points=stops.filter(s=>valid(s.latitude,s.longitude));
+    if(!points.length){node.textContent='No approved stop coordinates available.';return;}
+    const map=L.map(node),bounds=[];
+    for(const stop of points){const position=[stop.latitude,stop.longitude];bounds.push(position);L.marker(position,{title:`Approved stop ${stop.sequence}; independent accuracy unverified`,icon:L.divIcon({className:'buyer-map-pin',html:`<b>${Number(stop.sequence)}</b>`,iconSize:[28,28]})}).addTo(map);}
+    if(origin&&valid(origin.latitude,origin.longitude)){const position=[origin.latitude,origin.longitude];bounds.push(position);L.marker(position,{title:'Dispatcher-selected hub',icon:L.divIcon({className:'buyer-map-pin',html:'<b>H</b>',iconSize:[28,28]})}).addTo(map);}
+    map.fitBounds(bounds,{padding:[20,20],maxZoom:16});map.whenReady(()=>map.invalidateSize());
+    const button=document.createElement('button');button.type='button';button.className='btn sm';button.textContent='Load street tiles (OpenStreetMap)';node.after(button);
+    button.onclick=()=>{const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',referrerPolicy:'origin'}).addTo(map);tiles.on('tileerror',()=>button.textContent='Tiles unavailable; approved stop pins remain visible.');button.disabled=true;};
     mounted.push(()=>{map.remove();button.remove();});
   }
   // Buyer's map while the parcel is out: their delivery point and the rider's position. Returns its own cleanup.
@@ -182,5 +211,5 @@
       setMe(p){if(!valid(p?.lat,p?.lng))return;me?.remove();line?.remove();me=L.marker([p.lat,p.lng],{icon:L.divIcon({className:'rider-map-dot',html:'<i></i>',iconSize:[24,24],iconAnchor:[12,12]}),title:'You'}).addTo(map);
         line=L.polyline([[p.lat,p.lng],[h.lat,h.lng]],{color:'#16263A',weight:4,dashArray:'2 10',lineCap:'round'}).addTo(map);map.fitBounds(line.getBounds(),{padding:[80,80],maxZoom:17});}};
   }
-  globalThis.LannPyaCustomerMap={mount,destroy,routeView,riderView,hubView,viewOne:view,googleEnabled:()=>!!key()};
+  globalThis.LannPyaCustomerMap={mount,destroy,routeView,stopsView,riderView,hubView,viewOne:view,googleEnabled:()=>!!key()};
 })();

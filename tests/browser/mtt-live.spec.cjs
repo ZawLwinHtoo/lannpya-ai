@@ -1,4 +1,4 @@
-const {test,expect,inspect}=require('./fixtures.cjs');
+const {test,expect,inspect,saveManual,openDraftRoute}=require('./fixtures.cjs');
 const fs=require('node:fs');
 const path=require('node:path');
 // Map/network tests use local Leaflet. Optional remote font delivery is independent of API correctness.
@@ -10,8 +10,7 @@ async function manual(page){
   await f.locator('[name=areaId]').selectOption('Hlaing');
   await f.locator('[name=date]').fill(new Date(Date.now()+23400000).toISOString().slice(0,10));
   await f.locator('[name=received]').check();
-  await f.locator('button[type=submit],button:not([type])').last().click();
-  await expect(page.locator('#edit-form')).toBeVisible();
+  await saveManual(page,f);
   return new URL(page.url()).hash.split('/').at(-1);
 }
 async function buyerLink(page){
@@ -59,7 +58,7 @@ test('MTT browser creates persistent order, buyer pin, dispatcher review, rider 
   await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   await page.goto('/#/order/'+id);await page.locator('[data-action=assign]').click();
   await page.locator('dialog [name=acknowledge]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
-  await page.goto('/#/routes');await page.locator('[data-action=dispatch-route]').click();
+  await page.goto('/#/routes');await openDraftRoute(page);await page.locator('[data-action=dispatch-route]').click();
   await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   await page.goto('/#/ride');await expect(page.locator('.stop-name')).toContainText('Fictional MTT Buyer');
   await expect(page.locator('.reply-badge')).toContainText('At home');
@@ -67,10 +66,10 @@ test('MTT browser creates persistent order, buyer pin, dispatcher review, rider 
   await screenshot(page,'rider-approved-pin');
   await page.locator('[data-action=delivered]').click();await expect(page.locator('dialog')).toBeVisible();
   await page.locator('dialog button[type=submit]').click();expect((await inspect(page,'/api/orders/'+id)).status).toBe('OUT_FOR_DELIVERY');
-  await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
+  await page.locator('dialog [name=amount]').fill('25000');await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   expect((await inspect(page,'/api/orders/'+id)).status).toBe('DELIVERED');
-  await page.goto('/#/order/'+id);await page.getByText('History',{exact:true}).click();
-  await expect(page.locator('details').filter({has:page.getByText('History',{exact:true})})).toContainText(/DELIVERED|DELIVERY_COMPLETED/i);
+  await page.goto('/#/order/'+id);const history=page.locator('details').filter({has:page.locator('summary').filter({hasText:/^History$/})});await history.locator('summary').click();
+  await expect(history).toContainText(/DELIVERED|DELIVERY_COMPLETED/i);
   await page.reload();expect((await inspect(page,'/api/orders/'+id)).status).toBe('DELIVERED');
   const events=await inspect(page,`/api/orders/${id}/events`);expect(events.total).toBeGreaterThan(5);
 });
@@ -87,7 +86,7 @@ test('MTT reschedule is a separate review request; location review cannot approv
   await page.locator('#buyer-map').click({position:{x:140,y:150}});await page.locator('[name=initial_pin_acknowledged]').check();
   await page.locator('[name=answer]').selectOption('Reschedule');await page.locator('#customer-form [name=date]').fill(new Date(Date.now()+23400000+86400000).toISOString().slice(0,10));await page.locator('#customer-form [name=time]').selectOption('10:00–12:00');
   await page.locator('#customer-form .customer-primary').click();await expect(page.locator('.delivery-request-confirmed')).toBeVisible();
-  await page.goto('/#/order/'+id);await expect(page.locator('[data-review-request]')).toBeVisible();
+  await page.goto('/#/order/'+id);await expect(page.locator('[data-review-request]')).toHaveCount(2);
   await page.locator('[data-action=approve-location]').click();await page.locator('dialog [name=reason]').fill('Synthetic location review only');await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   let requests=(await inspect(page,`/api/orders/${id}/buyer-requests`)).items;expect(requests.find(r=>r.kind==='RESPONSE').resolution).toBeNull();
   await page.locator('[data-review-request]').click();await page.locator('dialog [name=reason]').fill('Synthetic courier review of cross-day request');await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
 
 
 class StrictModel(BaseModel):
@@ -28,6 +28,10 @@ class RoutingStatus(StrictModel):
     max_stops: int
     live_verified: Literal[False]
     two_wheeler_enabled: bool
+    maximum_requests_per_operation: int = 1
+    max_matrix_elements: int | None = None
+    remaining_requests: int = 0
+    explicit_external_consent_required: bool = True
 
 
 class Geometry(StrictModel):
@@ -44,7 +48,12 @@ class Geometry(StrictModel):
         return value
 
 
-class RouteQuery(StrictModel):
+class ExternalConsent(StrictModel):
+    request_id: UUID | None = None
+    authorize_external_request: bool = Field(default=False, strict=True)
+
+
+class RouteQuery(ExternalConsent):
     origin: Coordinate
     destination: Coordinate
     mode: Mode = "DRIVE"
@@ -95,7 +104,7 @@ class GoogleEstimateStatus(StrictModel):
     matrix_supported: Literal[False] = False
 
 
-class MatrixQuery(StrictModel):
+class MatrixQuery(ExternalConsent):
     locations: list[Coordinate] = Field(min_length=2, max_length=51)
     mode: Mode = "DRIVE"
     allow_simulation: bool = Field(default=False, strict=True)
@@ -105,16 +114,26 @@ class RoadMatrix(StrictModel):
     provider: str
     locations: list[Coordinate] = Field(min_length=2, max_length=51)
     mode: Mode
-    distances: list[list[int | None]]
-    durations: list[list[int | None]]
+    distances: list[list[StrictInt | None]]
+    durations: list[list[StrictInt | None]]
     quality: Quality
     traffic_aware: Literal[False] = False
     warnings: list[str] = Field(default_factory=list)
     attribution: str
+    profile: str | None = None
+    observation: str | None = None
+    source_indices: list[int] = Field(default_factory=list)
+    destination_indices: list[int] = Field(default_factory=list)
+    unreachable_pairs: list[dict] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def square(self):
         n = len(self.locations)
+        indices = list(range(n))
+        for name in ("source_indices", "destination_indices"):
+            if getattr(self, name) and getattr(self, name) != indices:
+                raise ValueError("Full square matrix indices must match location ordering")
+            setattr(self, name, indices.copy())
         for matrix in (self.distances, self.durations):
             if len(matrix) != n or any(len(row) != n for row in matrix):
                 raise ValueError("Routing matrix must be square and complete")
@@ -129,6 +148,14 @@ class RoadMatrix(StrictModel):
             for j in range(n):
                 if (self.distances[i][j] is None) != (self.durations[i][j] is None):
                     raise ValueError("Unreachable cells must omit both costs")
+        self.unreachable_pairs = [
+            {"origin_index": i, "destination_index": j, "code": "UNREACHABLE"}
+            for i in range(n)
+            for j in range(n)
+            if self.durations[i][j] is None
+        ]
+        if self.quality == "SIMULATED":
+            self.observation = "SIMULATED"
         return self
 
 
@@ -155,7 +182,7 @@ class PlanningOrder(StrictModel):
     priority: int = Field(default=0, ge=0, le=5, strict=True)
 
 
-class PlanQuery(StrictModel):
+class PlanQuery(ExternalConsent):
     origin: Coordinate
     orders: list[PlanningOrder] = Field(min_length=1, max_length=50)
     riders: list[PlanningRider] = Field(min_length=1, max_length=10)
@@ -220,6 +247,8 @@ class OptimizationResult(StrictModel):
     unassigned: list[dict]
     warnings: list[str]
     attribution: str
+    matrix_observation: str | None = None
+    travel_profile: str | None = None
 
 
 class PlanResponse(StrictModel):

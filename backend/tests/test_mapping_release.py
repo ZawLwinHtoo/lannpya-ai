@@ -80,7 +80,7 @@ def test_normalized_ors_road_matrix_reaches_solver_using_mock_transport_only():
 
     def handle(request):
         calls.append(request)
-        assert str(request.url) == "https://api.openrouteservice.org/v2/matrix/driving-car"
+        assert str(request.url) == "https://api.heigit.org/openrouteservice/v2/matrix/driving-car"
         body = json.loads(request.content)
         assert body["metrics"] == ["distance", "duration"] and body["units"] == "m"
         assert body["locations"][0] == [96.1, 16.8]

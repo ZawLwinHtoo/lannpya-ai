@@ -7074,6 +7074,23 @@
       },
       "MatrixQuery": {
         "properties": {
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "authorize_external_request": {
+            "type": "boolean",
+            "title": "Authorize External Request",
+            "default": false
+          },
           "locations": {
             "items": {
               "$ref": "#/components/schemas/Coordinate"
@@ -7216,6 +7233,28 @@
           "attribution": {
             "type": "string",
             "title": "Attribution"
+          },
+          "matrix_observation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matrix Observation"
+          },
+          "travel_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Travel Profile"
           }
         },
         "additionalProperties": false,
@@ -7809,6 +7848,23 @@
       },
       "PlanQuery": {
         "properties": {
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "authorize_external_request": {
+            "type": "boolean",
+            "title": "Authorize External Request",
+            "default": false
+          },
           "origin": {
             "$ref": "#/components/schemas/Coordinate"
           },
@@ -8790,6 +8846,50 @@
           "attribution": {
             "type": "string",
             "title": "Attribution"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation"
+          },
+          "source_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Source Indices"
+          },
+          "destination_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Destination Indices"
+          },
+          "unreachable_pairs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Unreachable Pairs"
           }
         },
         "additionalProperties": false,
@@ -8984,6 +9084,23 @@
       },
       "RouteQuery": {
         "properties": {
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "authorize_external_request": {
+            "type": "boolean",
+            "title": "Authorize External Request",
+            "default": false
+          },
           "origin": {
             "$ref": "#/components/schemas/Coordinate"
           },
@@ -9049,6 +9166,32 @@
           "two_wheeler_enabled": {
             "type": "boolean",
             "title": "Two Wheeler Enabled"
+          },
+          "maximum_requests_per_operation": {
+            "type": "integer",
+            "title": "Maximum Requests Per Operation",
+            "default": 1
+          },
+          "max_matrix_elements": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Matrix Elements"
+          },
+          "remaining_requests": {
+            "type": "integer",
+            "title": "Remaining Requests",
+            "default": 0
+          },
+          "explicit_external_consent_required": {
+            "type": "boolean",
+            "title": "Explicit External Consent Required",
+            "default": true
           }
         },
         "additionalProperties": false,

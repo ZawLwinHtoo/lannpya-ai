@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     )
     google_routes_api_key: SecretStr | None = None
     ors_api_key: SecretStr | None = None
+    ors_max_requests: int = Field(default=0, ge=0, le=10)
+    ors_max_matrix_elements: int = Field(default=16, ge=4, le=3500)
+    ors_budget_directory: Path = Path(__file__).resolve().parents[3] / ".tmp/ors-routing-budget"
     routing_two_wheeler_enabled: bool = False
     routing_request_timeout_seconds: float = Field(default=10, gt=0, le=30, allow_inf_nan=False)
     routing_max_stops: int = Field(default=25, ge=1, le=50)
@@ -50,8 +53,9 @@ class Settings(BaseSettings):
     buyer_link_hours: int = Field(default=72, ge=1, le=168)
     buyer_session_minutes: int = Field(default=15, ge=1, le=30)
     buyer_frontend_base_url: str | None = None
-    # Browser key for Google Maps JS + Places; restrict it by HTTP referrer in Google Cloud.
+    # Separate public Maps JavaScript key; require Website + API restrictions in Google Cloud.
     google_maps_browser_key: str | None = Field(default=None, max_length=200)
+    google_maps_browser_restrictions_confirmed: bool = False
     buyer_request_limit_per_minute: int = Field(default=60, ge=1, le=600)
     buyer_verify_limit_per_minute: int = Field(default=10, ge=1, le=60)
     buyer_rescheduling_enabled: bool = False

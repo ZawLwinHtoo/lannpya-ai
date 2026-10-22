@@ -4,9 +4,10 @@ from app.schemas.routing import MatrixQuery, RoadMatrix, RoadRoute, RouteQuery
 
 
 class RoutingFailure(Exception):
-    def __init__(self, code, status=503):
+    def __init__(self, code, status=503, *, provider_error=None):
         self.code, self.status = code, status
-        super().__init__(code)  # Never retain provider payloads, keys or coordinate URLs.
+        self.provider_error = provider_error  # Only bounded, redacted diagnostic fields.
+        super().__init__(code)  # Public errors/log strings remain stable safe codes.
 
 
 class RoadProvider(ABC):

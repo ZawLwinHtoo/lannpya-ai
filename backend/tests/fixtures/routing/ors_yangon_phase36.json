@@ -1,0 +1,76 @@
+{
+  "notice": "RECORDED PHASE 36 RESPONSE. Fictional test points; replay is not a new live provider observation.",
+  "source_observation": "ORS_ROAD_MATRIX",
+  "recorded_at": "2026-10-22T08:01:52.685522+00:00",
+  "locations": [
+    [
+      96.13,
+      16.825
+    ],
+    [
+      96.125,
+      16.815
+    ],
+    [
+      96.142,
+      16.81
+    ],
+    [
+      96.153,
+      16.8
+    ]
+  ],
+  "distances": [
+    [
+      0.0,
+      2004.79,
+      2929.23,
+      4252.91
+    ],
+    [
+      1768.12,
+      0.0,
+      2819.07,
+      4142.74
+    ],
+    [
+      3245.66,
+      2799.81,
+      0.0,
+      2047.64
+    ],
+    [
+      4314.88,
+      4141.3,
+      2170.24,
+      0.0
+    ]
+  ],
+  "durations": [
+    [
+      0.0,
+      235.38,
+      266.94,
+      438.67
+    ],
+    [
+      236.59,
+      0.0,
+      252.43,
+      424.15
+    ],
+    [
+      233.09,
+      268.81,
+      0.0,
+      210.05
+    ],
+    [
+      429.48,
+      433.18,
+      219.8,
+      0.0
+    ]
+  ],
+  "attribution": "openrouteservice / OpenStreetMap contributors"
+}

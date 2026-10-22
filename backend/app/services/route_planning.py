@@ -234,6 +234,8 @@ def preview(session, actor, settings, query, provider=None):
                 locations=[query.origin] + [s["coordinate"] for s in stops],
                 mode=query.mode,
                 allow_simulation=query.allow_simulation,
+                request_id=query.request_id,
+                authorize_external_request=query.authorize_external_request,
             )
         )
         if stops
@@ -256,6 +258,12 @@ def preview(session, actor, settings, query, provider=None):
     else:
         result = optimize(query, matrix, stops, profiles)
         for vehicle in result.vehicles:
+            if getattr(provider, "matrix_only_preview", False):
+                vehicle.geometry_warning = (
+                    "ORS matrix contains no road geometry. No extra Directions request was made; "
+                    "use the approved stop list and external navigation."
+                )
+                continue
             points = [query.origin] + [
                 Coordinate(latitude=s.latitude, longitude=s.longitude) for s in vehicle.stops
             ]

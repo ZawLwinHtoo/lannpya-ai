@@ -1177,3 +1177,11 @@ See [MTT workflows and startup](mtt-integration/WORKFLOWS_AND_STARTUP.md) for ex
 proxy envelopes, native endpoint mappings, buyer-review behavior and unsupported
 demo-only operations. The generated [MTT OpenAPI snapshot](mtt-integration/OPENAPI.json)
 contains 35 business operations. This local BFF is not production authentication.
+
+## Current mapping contract (Phase 32)
+
+The historical MTT snapshot above is retained as phase evidence. Current generated
+snapshots are [OPENAPI.json](OPENAPI.json) and [integration/OPENAPI.json](integration/OPENAPI.json),
+with 45 operations. See the [mapping contract](mapping-routing/API_CONTRACT.md) for
+Google's consented single-route endpoint, bounded ORS matrix authorization, additive
+matrix provenance fields, and unchanged route preview/commit/rider-plan endpoints.

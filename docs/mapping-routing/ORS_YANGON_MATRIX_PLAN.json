@@ -1,0 +1,54 @@
+{
+  "status": "PLAN_ONLY_AUTHORIZATION_REQUIRED",
+  "notice": "FICTIONAL TEST COORDINATES; not verified doorstep locations",
+  "credential_configured": false,
+  "method": "POST",
+  "endpoint": "https://api.openrouteservice.org/v2/matrix/driving-car",
+  "proposed_requests": 1,
+  "matrix_shape": [
+    4,
+    4
+  ],
+  "matrix_elements": 16,
+  "http_requests_sent": 0,
+  "google_requests_proposed": 0,
+  "google_request_budget": 0,
+  "request_timeout_seconds": 10.0,
+  "retries": 0,
+  "body": {
+    "locations": [
+      [
+        96.13,
+        16.825
+      ],
+      [
+        96.125,
+        16.815
+      ],
+      [
+        96.142,
+        16.81
+      ],
+      [
+        96.153,
+        16.8
+      ]
+    ],
+    "metrics": [
+      "distance",
+      "duration"
+    ],
+    "units": "m"
+  },
+  "server_budget": {
+    "remaining_requests": 0,
+    "max_matrix_elements": 16
+  },
+  "requirements": [
+    "Owner supplies a server-side ORS Standard key through LANNPYA_ORS_API_KEY",
+    "Owner verifies current plan, matrix entitlement, quota and terms in dashboard",
+    "Owner explicitly authorizes exactly one 4x4 request before enabling any live gate",
+    "Keep Google budget zero; no Directions, geocoding or geometry request is proposed"
+  ],
+  "cost": "No verified current account quota or billing status inferred from a key"
+}

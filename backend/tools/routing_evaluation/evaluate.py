@@ -239,20 +239,18 @@ class GuardedProvider(HTTPProvider):
 
     def post(self, endpoint, body, headers, deadline):
         prefix = (
-            "https://routes.googleapis.com/"
-            if self.name == "google"
-            else "https://api.openrouteservice.org/"
+            "https://routes.googleapis.com/" if self.name == "google" else "https://api.heigit.org/"
         )
         if not endpoint.startswith(prefix):
             raise EvaluationBlocked("UNEXPECTED_PROVIDER_ENDPOINT")
         if endpoint in {
             "https://routes.googleapis.com/directions/v2:computeRoutes",
-            "https://api.openrouteservice.org/v2/directions/driving-car/geojson",
+            "https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson",
         }:
             kind, elements = "route", 0
         elif endpoint == "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix":
             kind, elements = "matrix", len(body["origins"]) * len(body["destinations"])
-        elif endpoint == "https://api.openrouteservice.org/v2/matrix/driving-car":
+        elif endpoint == "https://api.heigit.org/openrouteservice/v2/matrix/driving-car":
             kind, elements = "matrix", len(body["locations"]) ** 2
         else:
             raise EvaluationBlocked("UNEXPECTED_PROVIDER_ENDPOINT")

@@ -93,7 +93,7 @@ test('created order closes back to its form and can return to the board',async t
  for(const[k,v]of Object.entries({name:'Synthetic Buyer',phone:'09790000000',item:'Envelope',expected:'25000'}))await form.locator(`[name=${k}]`).fill(v);
  await form.locator('aside button').click();await page.locator('.created-dialog').waitFor();
  assert.ok(await page.locator('[data-created=close]').evaluate(n=>{const b=n.getBoundingClientRect(),d=n.closest('dialog').getBoundingClientRect();return b.left>d.left+d.width/2&&b.top<d.top+60;}));
- await shot(page,'order-created');await page.locator('[data-created=close]').click();assert.equal(await page.locator('dialog').count(),0);assert.equal(state.orders.length,1);assert.ok(page.url().endsWith('#/manual'));
+ await shot(page,'order-created');await page.locator('[data-created=close]').click();await page.locator('dialog').waitFor({state:'detached'});assert.equal(await page.locator('dialog').count(),0);assert.equal(state.orders.length,1);assert.ok(page.url().endsWith('#/manual'));
  await form.locator('[name=name]').fill('Second buyer');await form.locator('[name=phone]').fill('09790000001');await form.locator('[name=item]').fill('Second envelope');await form.locator('[name=expected]').fill('1000');
  await form.locator('aside button').click();await page.locator('[data-created=board]').click();await page.waitForURL('**/#/dispatch');assert.equal(state.orders.length,2);
 });

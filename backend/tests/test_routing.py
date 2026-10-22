@@ -101,7 +101,10 @@ def test_offline_is_explicit_and_graph_cost_is_not_straight_line():
         )
 
 
-def test_missing_credentials_external_gate_and_no_silent_fallback():
+def test_missing_credentials_external_gate_and_no_silent_fallback(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.routing.credentials.PRIVATE_ENV", tmp_path / "absent-private.env")
+    monkeypatch.delenv("LANNPYA_ORS_API_KEY", raising=False)
+    monkeypatch.delenv("ORS_API_KEY", raising=False)
     for provider in ("google", "ors"):
         s = Settings(_env_file=None, routing_provider=provider)
         with pytest.raises(RoutingFailure, match="DISABLED"):
