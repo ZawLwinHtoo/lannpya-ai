@@ -1,0 +1,313 @@
+{
+  "baseline": "10daf38159ff2d9fb11d9d79333723eb6c70e453",
+  "implementation_commit": "1ad01380ee49f4fe3dd59773c77fd7c2474835dd",
+  "counts": {
+    "REQUIRED_MAPPING_INTEGRATION": 8,
+    "MAPPING_FEATURE": 14,
+    "MAPPING_TEST": 20,
+    "MAPPING_DOCUMENTATION": 18
+  },
+  "unintended_changes": 0,
+  "files": [
+    {
+      "path": "backend/.env.example",
+      "classification": "REQUIRED_MAPPING_INTEGRATION",
+      "reason": "Minimal configuration, API, persistence boundary or existing MTT UI integration."
+    },
+    {
+      "path": "backend/app/api/routing.py",
+      "classification": "REQUIRED_MAPPING_INTEGRATION",
+      "reason": "Minimal configuration, API, persistence boundary or existing MTT UI integration."
+    },
+    {
+      "path": "backend/app/core/config.py",
+      "classification": "REQUIRED_MAPPING_INTEGRATION",
+      "reason": "Minimal configuration, API, persistence boundary or existing MTT UI integration."
+    },
+    {
+      "path": "backend/app/routing/base.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/app/routing/browser_credentials.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/app/routing/credentials.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/app/routing/diagnostics.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/app/routing/endpoints.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/app/routing/factory.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/app/routing/http.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/app/routing/optimizer.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/app/routing/ors.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/app/schemas/routing.py",
+      "classification": "REQUIRED_MAPPING_INTEGRATION",
+      "reason": "Minimal configuration, API, persistence boundary or existing MTT UI integration."
+    },
+    {
+      "path": "backend/app/services/route_planning.py",
+      "classification": "REQUIRED_MAPPING_INTEGRATION",
+      "reason": "Minimal configuration, API, persistence boundary or existing MTT UI integration."
+    },
+    {
+      "path": "backend/tests/fixtures/routing/ors_yangon_phase36.json",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "backend/tests/test_google_browser_credentials.py",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "backend/tests/test_mapping_release.py",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "backend/tests/test_ors_credentials.py",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "backend/tests/test_ors_integration.py",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "backend/tests/test_ors_recorded.py",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "backend/tests/test_routing.py",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "backend/tests/test_routing_diagnostics.py",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "backend/tools/backend_test_dashboard/server.py",
+      "classification": "REQUIRED_MAPPING_INTEGRATION",
+      "reason": "Minimal configuration, API, persistence boundary or existing MTT UI integration."
+    },
+    {
+      "path": "backend/tools/google_browser_map.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/tools/ors_matrix_probe.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "backend/tools/routing_evaluation/evaluate.py",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "docs/API_CONTRACT.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/OPENAPI.json",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/integration/MTT_MAPPING_COMPATIBILITY.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/integration/MTT_MAPPING_DATABASE_HANDOFF.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/integration/MTT_MAPPING_FILE_AUDIT.json",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/integration/MTT_MAPPING_PORT_REPORT.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/integration/OPENAPI.json",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/API_CONTRACT.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/ORS_YANGON_MATRIX_PLAN.json",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/PHASE32_FINAL_GOOGLE_ORS_INTEGRATION.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/PHASE33_ORS_LIVE_VERIFICATION.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/PHASE33_ORS_REQUEST_PLAN.json",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/PHASE34_LIVE_ORS_RESULT.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/PHASE35_ORS_403_DIAGNOSIS.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/PHASE36_LIVE_ORS_RESULT.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/PHASE37_FINAL_UI_VERIFICATION.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/PHASE38_GOOGLE_MAP_VERIFICATION.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "docs/mapping-routing/PHASE39_GOOGLE_BROWSER_ACCEPTANCE.md",
+      "classification": "MAPPING_DOCUMENTATION",
+      "reason": "Mapping contracts, source evidence, generated OpenAPI or Phase 40 handoff."
+    },
+    {
+      "path": "frontend/js/customer-map.js",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "frontend/js/functional-app.js",
+      "classification": "REQUIRED_MAPPING_INTEGRATION",
+      "reason": "Minimal configuration, API, persistence boundary or existing MTT UI integration."
+    },
+    {
+      "path": "frontend/js/live-store.mjs",
+      "classification": "REQUIRED_MAPPING_INTEGRATION",
+      "reason": "Minimal configuration, API, persistence boundary or existing MTT UI integration."
+    },
+    {
+      "path": "frontend/js/routing-ui.mjs",
+      "classification": "MAPPING_FEATURE",
+      "reason": "Provider, credentials, normalized road matrix, solver metadata or map presentation."
+    },
+    {
+      "path": "frontend/tests/live-store.test.mjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "frontend/tests/order-flows.browser.test.cjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "frontend/tests/routing-ui.test.mjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "tests/browser/fixtures.cjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "tests/browser/google-route-display.spec.cjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "tests/browser/google-workflow.spec.cjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "tests/browser/mapping-release.spec.cjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "tests/browser/mtt-live.spec.cjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "tests/browser/mtt-mapping-preservation.spec.cjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "tests/browser/ors-recorded.spec.cjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "tests/browser/ors-workflow.spec.cjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    },
+    {
+      "path": "tests/browser/routing.spec.cjs",
+      "classification": "MAPPING_TEST",
+      "reason": "Mapping regression, recorded provider fixtures or synchronization with retained MTT UI."
+    }
+  ]
+}
