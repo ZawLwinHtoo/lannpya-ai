@@ -458,6 +458,11 @@
       if(map){map.outerHTML=o?.pin?`<div class="live-map" data-view-map data-lat="${o.pin.lat}" data-lng="${o.pin.lng}" aria-label="Assigned delivery point"></div>`:'<p class="live-notice">No saved delivery pin available.</p>';}
             const refresh=$('.rider-demo [data-action=refresh-queue]');if(refresh){refresh.remove();$('.rider-head')?.insertAdjacentHTML('afterend',btn('Refresh approved stops','refresh-queue','','quiet sm'));}
     }
+    // Mapping integration: retain MTT's route tiles and mount planning below them.
+    if(path==='routes'){
+      const container=document.createElement('section');container.className='panel functional-card routing-panel';$('.content').append(container);
+      window.LannPyaRouting.mount({container,store,afterCommit:async()=>{await store.sync('routes');render();toast('Route assignments persisted. Dispatch departure remains a separate action.');}}).catch(err=>{if(container.isConnected)container.textContent='Routing unavailable: '+err.message;});
+    }
     if(rider&&!/^ride\/(returns|handover|history)/.test(path)){const container=document.createElement('section');container.className='panel functional-card routing-panel';$('.rider-body').append(container);window.LannPyaRouting.rider({container,store}).catch(err=>{if(container.isConnected)container.textContent='Route plan unavailable: '+err.message;});}
     if(customer&&path==='customer')$('.functional-card')?.remove();
     globalThis.LannPyaCustomerMap?.mount($('#customer-form'));

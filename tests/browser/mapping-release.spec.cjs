@@ -50,7 +50,7 @@ for(const [width,height] of [[1440,900],[1366,768],[768,1024],[390,844],[360,740
       const commit=page.locator('#commit-routing-plan');await commit.locator('[name=ack]').check();await commit.locator('[name=simulation]').check();await commit.locator('[type=submit]').click();
       await expect(page.locator('a.route-tile')).toBeVisible();await openDraftRoute(page);await page.locator('[data-action=dispatch-route]').click();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
       await page.goto('/#/ride');await expect(page.locator('body')).toContainText('Assigned route plan');await expect(page.locator('body')).toContainText('Synthetic release doorstep note');
-      await expect(page.locator('.google-road-estimate button[type=submit]')).toBeDisabled();
+      await expect(page.locator('.google-road-estimate')).toHaveCount(0); // MTT keeps external estimates on dispatcher screens.
       const navigation=page.locator('a[href*="google.com/maps/dir"]').first();await expect(navigation).toBeVisible();
       expect(new URL(await navigation.getAttribute('href')).searchParams.has('destination')).toBe(true);
       await page.context().route('https://www.google.com/maps/**',r=>r.fulfill({status:200,contentType:'text/html',body:'Synthetic navigation target; no Google network call'}));

@@ -2,9 +2,9 @@
 
 > Historical source-worktree evidence from Phases 32?39. For the current MTT-based port and its actual test results, see [Phase 40 report](../integration/MTT_MAPPING_PORT_REPORT.md). No live provider verification was repeated during this port.
 
-Date: 2026-10-22  
-Worktree: `LannPya-AI-google-ors`  
-Branch: `feature/google-ors-mapping-final`  
+Date: 2026-10-22
+Worktree: `LannPya-AI-google-ors`
+Branch: `feature/google-ors-mapping-final`
 HEAD: `81a30d726e1a29b9914f0e8f1545ab79cabda45d`
 
 ## Result

@@ -9,6 +9,29 @@ function apiFixture(){
   return {api,calls};
 }
 const setup=async(route='dispatch')=>{const f=apiFixture();const dictionary=W();return {...f,dictionary,store:await createLiveStore(dictionary,{api:f.api,origin:'http://127.0.0.1:8780',route})};};
+
+test('live creation preserves explicit pins but never persists demo address-point estimates',async t=>{
+ t.mock.getter(globalThis,'navigator',()=>({onLine:true}));const f=apiFixture();let estimates=0;
+ const dictionary={...W(),PLACES:[{id:'hlaing',aliases:['Hlaing']}],addressPoint:()=>{estimates++;return {point:{lat:16.8,lng:96.1},precision:'township'};}};
+ const store=await createLiveStore(dictionary,{api:f.api,origin:'http://127.0.0.1:8780',route:'dispatch'});
+ const fields={name:'Synthetic buyer',phone:'09790000000',areaId:'Hlaing',street:'Test street',payment:'prepaid',item:'Envelope',date:'2026-10-23',lat:'',lng:''};
+ await store.execute('create_manual',{fields});
+ const first=f.calls.find(c=>c.path==='/api/orders'&&c.method==='POST').body.structured;
+ assert.equal(Object.hasOwn(first,'latitude'),false);assert.equal(Object.hasOwn(first,'longitude'),false);assert.equal(estimates,0);
+ await store.execute('create_manual',{fields:{...fields,lat:'16.8100000',lng:'96.1100000'}});
+ const second=f.calls.filter(c=>c.path==='/api/orders'&&c.method==='POST').at(-1).body.structured;
+ assert.equal(second.latitude,'16.8100000');assert.equal(second.longitude,'96.1100000');assert.equal(estimates,0);
+});
+
+test('raw live import cannot backfill canonical GPS from browser demo geodata',async t=>{
+ t.mock.getter(globalThis,'navigator',()=>({onLine:true}));const f=apiFixture();let estimates=0,parsed=0,patches=0;
+ const dictionary={...W(),PLACES:[{id:'hlaing',aliases:['Hlaing']}],parse:()=>{parsed++;return {areaId:'Hlaing'};},addressPoint:()=>{estimates++;return {point:{lat:16.8,lng:96.1},precision:'township'};}};
+ f.api.patch=async()=>{patches++;};
+ const store=await createLiveStore(dictionary,{api:f.api,origin:'http://127.0.0.1:8780',route:'dispatch'});
+ await store.execute('create_batch',{records:[{raw:'Fictional Hlaing delivery'}],item:'Envelope',date:'2026-10-23'});
+ assert.equal(estimates,0);assert.equal(parsed,0);assert.equal(patches,0);
+ assert.equal(f.calls.find(c=>c.path==='/api/orders'&&c.method==='POST').body.raw_text,'Fictional Hlaing delivery');
+});
 test('live projection never manufactures coordinates, anchors or GREEN',()=>{
  const o=projectOrder(original);assert.equal(o.pin,null);assert.equal(o.anchor,null);assert.equal(o.confidence,'AMBER');assert.equal(o.expected,25000);
  const p=projectOrder({...original,latitude:'0',longitude:'0'});assert.deepEqual(p.pin,{lat:0,lng:0});assert.equal(p.location,'manual_unverified');

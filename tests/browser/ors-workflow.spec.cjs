@@ -30,7 +30,7 @@ for(const width of [1440,390])test(`ORS matrix preview, commit and rider sequenc
   await openDraftRoute(page);await page.locator('[data-action=dispatch-route]').click();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   await page.goto('/#/ride');await expect(page.locator('body')).toContainText('ORS_MOCK_MATRIX');
   await expect(page.locator('a[href*="google.com/maps/dir"]')).toBeVisible();
-  await expect(page.locator('.google-road-estimate')).toContainText('Live Google requests disabled');
+  await expect(page.locator('.google-road-estimate')).toHaveCount(0); // Latest MTT keeps Google request controls dispatcher-only.
   await page.reload();await expect(page.locator('body')).toContainText('ORS_MOCK_MATRIX');
   await page.goto('/#/routes');await expect(page.locator('#routing-plan-form [type=submit]')).toBeDisabled();
   expect((await inspect(page,'/api/routes/provider-status')).remaining_requests).toBe(0);

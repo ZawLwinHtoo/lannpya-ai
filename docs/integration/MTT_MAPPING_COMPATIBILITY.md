@@ -56,3 +56,29 @@ developer changes; those are preserved and tested locally. Local environments
 are created separately; no source environment, secret file or database is copied.
 The original mapping worktree and running manual demo remain untouched.
 Verification totals and any discovered incompatibilities are recorded in the final report.
+
+## Upstream refresh during verification
+
+A subsequent fetch found PR #15: MTT advanced to
+`10daf38159ff2d9fb11d9d79333723eb6c70e453`. The unpublished mapping checkpoint
+was replayed onto that commit. No team branch was rewritten. The new typography,
+board deletion/undo, name/COD parser changes and database implementation remain
+the product foundation. The fresh upstream snapshot is also available in the
+separate read-only `LannPya-AI-phase40-mtt-baseline` worktree for comparison.
+
+Two strictly mapping-related integration exceptions are necessary:
+
+1. PR #15 removed the dispatcher planner mount. Five lines restore the existing
+   planner below MTT's route tiles; navigation and styling remain MTT's. MTT's
+   removal of external Google request controls from rider screens is retained.
+2. PR #15 automatically persisted demo address/township points as manual live
+   coordinates (and silently ignored failures during batch backfill). Those
+   automatic writes are removed. Explicit manual coordinates and buyer-reviewed
+   locations remain supported. Demo/parser approximate points stay in MTT's
+   prototype/domain code, but cannot silently become live canonical destinations.
+   A future approximate-location feature needs a separate provenance/review contract.
+
+The latest MTT baseline passes 131 frontend tests; its TypeScript suite has
+142 passed and one pre-existing name/redaction regression. A pre-existing native
+dialog-close test race is resolved by waiting for detachment without removing its
+assertions. Neither the TypeScript implementation nor the product dialog is replaced.

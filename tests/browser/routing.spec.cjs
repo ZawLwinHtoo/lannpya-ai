@@ -42,8 +42,7 @@ test('routing preview, explicit commit, map geometry, rider COD and safe remaini
   await page.locator('[data-open-plan]').click();await expect(page.locator('#routing-preview')).toContainText('COMMITTED');
   await openDraftRoute(page);await page.locator('[data-action=dispatch-route]').click();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   await page.goto('/#/ride');await expect(page.locator('body')).toContainText('Assigned route plan');
-  await expect(page.locator('.google-road-estimate')).toContainText('Live Google requests disabled');
-  await expect(page.locator('.google-road-estimate button[type=submit]')).toBeDisabled();
+  await expect(page.locator('.google-road-estimate')).toHaveCount(0); // MTT keeps external estimates on dispatcher screens.
   await expect(page.locator('[data-plan-map].leaflet-container')).toHaveCount(1);
   await expect(page.locator('a[href*="google.com/maps/dir"]')).toBeVisible();
   await page.locator('[data-action=delivered]').click();await page.locator('dialog [name=amount]').fill('25000');await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);

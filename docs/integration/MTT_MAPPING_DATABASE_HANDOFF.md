@@ -1,6 +1,6 @@
 # Mapping data contract for the database developer
 
-Phase 40 is based on MTT `497775b`. No database models, SQLAlchemy session code,
+Phase 40 is based on latest verified MTT `10daf38` (initial audit: `497775b`). No database models, SQLAlchemy session code,
 Alembic files, driver declarations or database developer tools are changed.
 No hosted database is accessed. MTT's existing PostgreSQL URL aliases, JSONB
 variant, pooling and migration history remain authoritative.
