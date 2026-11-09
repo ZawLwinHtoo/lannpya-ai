@@ -172,7 +172,7 @@ def test_alembic_migration_revisions_chain():
     config = Config(str(BACKEND_ROOT / "alembic.ini"))
     script = ScriptDirectory.from_config(config)
     head = script.get_current_head()
-    assert head == "0007_buyer_otp"
+    assert head == "0009_delivery_positions"
 
     # Walk through revisions from head down to base
     revs = []
@@ -182,6 +182,8 @@ def test_alembic_migration_revisions_chain():
         curr = script.get_revision(curr.down_revision) if curr.down_revision else None
 
     assert revs == [
+        "0009_delivery_positions",
+        "0008_buyer_edit_policy",
         "0007_buyer_otp",
         "0006_automatic_assignment",
         "0005_routing_plans",

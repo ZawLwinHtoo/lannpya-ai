@@ -115,29 +115,39 @@ def test_mtt_cod_delivery_pin_and_audit_persist_after_application_restart(tmp_pa
                 "reason": "Synthetic location; no claim of a real customer home",
             },
         )
-        rider = call(client, "GET", "/api/riders")["items"][0]
+        call(
+            client,
+            "PATCH",
+            "/api/confirm/@buyer/response",
+            {"request_id": str(uuid4()), "action": "AVAILABLE"},
+            buyer_handle=handle,
+        )
         current = call(client, "GET", path)
         prepared = call(
             client,
             "POST",
-            path + "/prepare-assignment",
+            path + "/auto-assignment",
             {
                 "request_id": str(uuid4()),
                 "expected_version": current["version"],
-                "rider_id": rider["id"],
                 "acknowledge_unverified_location": True,
             },
         )
-        route = prepared["route"]
+        assignment = prepared["assignment"]
+        rider = {"id": assignment["rider_id"]}
         call(
             client,
-            "POST",
-            f"/api/routes/{route['id']}/actions",
+            "PATCH",
+            f"/api/riders/{rider['id']}/deliveries/{identifier}/status",
             {
                 "request_id": str(uuid4()),
-                "expected_version": route["version"],
-                "action": "DISPATCH",
+                "expected_version": prepared["order"]["version"],
+                "action": "ACCEPT",
+                "assignment_id": assignment["id"],
+                "offer_version": assignment["offer_version"],
             },
+            actor="rider",
+            rider_id=rider["id"],
         )
         current = call(client, "GET", path)
         call(

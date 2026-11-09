@@ -97,8 +97,11 @@ def test_acceptance_starts_delivery_and_preserves_dispatcher_closeout(workspace)
     assert accepted["response_status"] == "ACCEPTED"
     assert accepted["status"] == "OUT_FOR_DELIVERY"
     result["order"]["version"] = accepted["order_version"]
-    route = next(r for r in save(workspace[0]["admin"].get("/api/routes"))["items"]
-                 if r["id"] == result["route"]["id"])
+    route = next(
+        r
+        for r in save(workspace[0]["admin"].get("/api/routes"))["items"]
+        if r["id"] == result["route"]["id"]
+    )
     assert route["state"] == "dispatched"
     assert route["items"][0]["status"] == "OUT_FOR_DELIVERY"
     current = save(workspace[0]["admin"].get(f"/api/orders/{result['order']['id']}"))
@@ -110,10 +113,12 @@ def test_acceptance_starts_delivery_and_preserves_dispatcher_closeout(workspace)
         == "DELIVERED"
     )
     assert route["state"] == "dispatched"
-    rider_key = next(k for k, v in workspace[1].items()
-                     if str(v) == result["assignment"]["rider_id"])
-    handed = save(action(workspace[0][rider_key], route, "HANDOVER",
-                         amount=25000, recorded_total=25000))
+    rider_key = next(
+        k for k, v in workspace[1].items() if str(v) == result["assignment"]["rider_id"]
+    )
+    handed = save(
+        action(workspace[0][rider_key], route, "HANDOVER", amount=25000, recorded_total=25000)
+    )
     closed = save(action(workspace[0]["admin"], handed, "RECEIVE_CLOSE", amount=25000))
     assert closed["state"] == "closed"
 
@@ -416,3 +421,27 @@ def test_migration_preserves_existing_assignments_and_action_receipts(tmp_path):
 
         assert session.scalar(select(RiderActionReceipt)).result == {"legacy": True}
     db.dispose()
+
+
+def test_instruction_update_preserves_customer_availability(workspace):
+    row = confirmed(workspace)
+    with workspace[2].sessions.begin() as session:
+        link = session.scalar(
+            select(ConfirmationLink).where(ConfirmationLink.order_id == UUID(row["id"]))
+        )
+        session.add(
+            BuyerRequest(
+                order_id=UUID(row["id"]),
+                link_id=link.id,
+                request_id=uuid4(),
+                payload_hash=uuid4().hex * 2,
+                kind="RESPONSE",
+                decision="APPLIED",
+                reason_codes=[],
+                previous_values={},
+                submitted_values={"action": "INSTRUCTIONS", "instructions": "Ring twice"},
+                created_at=utcnow() + timedelta(seconds=1),
+            )
+        )
+    result = save(auto(workspace, row))
+    assert result["allocation_status"] == "ASSIGNED"
