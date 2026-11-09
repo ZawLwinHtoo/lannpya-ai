@@ -15,3 +15,5 @@
 @media(max-width:450px){.live-map{height:260px}}
 
 .routing-panel,.plan-vehicle{min-width:0;overflow-wrap:anywhere}.routing-panel fieldset{min-width:0;border:1px solid #baa98b;padding:16px;margin:16px 0}.routing-panel label{display:block;margin:8px 0}.routing-panel .inline-check{display:flex;align-items:flex-start;gap:8px}.routing-panel input:not([type=checkbox]),.routing-panel select{max-width:100%;box-sizing:border-box}.routing-panel .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.routing-panel li{margin:8px 0}.plan-vehicle{padding:12px;border-top:1px solid #baa98b}
+/* Keep the acknowledgement in place when entering coordinates updates the map hint. */
+#map-selection-status{min-block-size:5em}
