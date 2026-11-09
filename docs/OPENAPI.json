@@ -2394,7 +2394,11 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Tracking Api Confirm  Token  Tracking Get"
+                }
               }
             }
           },
@@ -3020,7 +3024,11 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Tracking Api Riders  Rider Id  Deliveries  Order Id  Tracking Get"
+                }
               }
             }
           },
@@ -3137,7 +3145,11 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Share Position Api Riders  Rider Id  Deliveries  Order Id  Tracking Post"
+                }
               }
             }
           },

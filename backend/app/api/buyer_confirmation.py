@@ -138,7 +138,7 @@ def details(
     return service(request, session).details(token, credential(authorization))
 
 
-@public_router.get("/{token}/tracking")
+@public_router.get("/{token}/tracking", response_model=dict)
 def tracking(
     token: str, request: Request, session: PublicSession, authorization: Authorization = None
 ):
