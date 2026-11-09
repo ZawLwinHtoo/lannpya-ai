@@ -72,9 +72,7 @@ test('selected application connects admin, native buyer verification, dispatcher
   await e.action('accept-offer',id);
   const routes=await api.all('admin','/api/routes');assert.equal(routes.length,2);
   const acceptedOrder=await api.order(id),routeId=context(acceptedOrder).route_id,route=routes.find(r=>r.id===routeId);
-  assert.ok(route);assert.equal(route.state,'draft');
-  e.ctx.location.hash='#/order/'+id;await wait(()=>e.all('[data-action]').some(b=>b.dataset.action==='dispatch'),'accepted dispatcher departure action');
-  await e.action('dispatch',route.id);await e.submit('dialog form',{});
+  assert.ok(route);assert.equal(route.state,'dispatched');
   assert.equal((await api.order(id)).status,'OUT_FOR_DELIVERY');
   e.ctx.location.hash='#/rider';await wait(()=>e.all('[data-action]').some(b=>b.dataset.action==='deliver'),'accepted rider queue');
   await e.action('deliver',id);await e.tick(2000);await e.submit('dialog form',{amount:'25000',reason:''});
@@ -92,7 +90,14 @@ test('selected application connects admin, native buyer verification, dispatcher
   assert.equal((await api.order(failedId)).confidence_level,'RED');
   await e.submit('#edit-api-form',{customer_name:'Fictional second buyer',customer_phone:'09790000000',township:'Hlaing',street:'Fictional Street',cod_amount:'0',latitude:'0',longitude:'0'});
   assert.equal((await api.order(failedId)).confidence_level,'AMBER');
+  const secondLink=await api.call('admin',`/api/orders/${failedId}/confirmation-link`,{method:'POST'});
+  const buyer=api.openBuyer(origin,secondLink.confirmation_url);
+  await buyer.requestOtp();await buyer.verify((await buyer.demoCode()).code);
+  await buyer.respond({request_id:crypto.randomUUID(),action:'AVAILABLE'});
+  e.ctx.location.hash='#/admin';await wait(()=>e.find('#create-form'),'refresh dispatcher context');
+  e.ctx.location.hash='#/order/'+failedId;await wait(()=>e.find('#edit-api-form'),'refresh buyer response');
   await e.submit('#auto-assignment-form',{received:true,ack:true});
+  assert.equal((await api.order(failedId)).status,'ASSIGNED',JSON.stringify(context(await api.order(failedId)))+' '+e.find('#api-status')?.textContent);
   const secondAssignments=await api.all('admin',`/api/orders/${failedId}/assignments?page=1&page_size=100`);
   const secondOffer=secondAssignments.at(-1);assert.equal(secondOffer.response_status,'PENDING');
   e.ctx.location.hash='#/rider';await wait(()=>e.all('[data-action]').some(b=>b.dataset.action==='disconnect'),'second rider session');
@@ -100,8 +105,6 @@ test('selected application connects admin, native buyer verification, dispatcher
   await e.submit('#connect-form',{base:origin,actor_id:secondOffer.rider_id});
   await wait(()=>e.all('[data-action]').some(b=>b.dataset.action==='accept-offer'),'second offer');await e.action('accept-offer',failedId);
   const failedOrder=await api.order(failedId),secondRoute=(await api.all('admin','/api/routes')).find(r=>r.id===context(failedOrder).route_id);
-  e.ctx.location.hash='#/order/'+failedId;await wait(()=>e.find('#edit-api-form'),'second dispatcher order');
-  await e.action('dispatch',secondRoute.id);await e.submit('dialog form',{});
   e.ctx.location.hash='#/rider';await wait(()=>e.all('[data-action]').some(b=>b.dataset.action==='failed'),'second rider queue');
   await e.action('failed',failedId);await e.submit('dialog form',{failure_reason:'CUSTOMER_UNAVAILABLE',failure_note:'Fictional buyer unavailable'});
   assert.equal((await api.order(failedId)).status,'FAILED');
