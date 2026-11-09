@@ -42,7 +42,7 @@ async function lookup(page,double=false){
 }
 async function submit(page){
   await page.locator('[name=latitude]').fill('16.8');await page.locator('[name=longitude]').fill('96.1');
-  if(!await page.locator('[name=initial_pin_acknowledged]').isChecked()){if(!await page.locator('[name=initial_pin_acknowledged]').isChecked()){await page.locator('[name=initial_pin_acknowledged]').focus();await page.locator('[name=initial_pin_acknowledged]').press('Space');}}
+  if(!await page.locator('[name=initial_pin_acknowledged]').isChecked()){await page.locator('[name=initial_pin_acknowledged]').focus();await page.locator('[name=initial_pin_acknowledged]').press('Space');}
   const response=page.waitForResponse(r=>r.url().endsWith('/request')&&r.request().method()==='PATCH');
   await page.locator('#customer-form .customer-primary').click();
   expect((await response).status()).toBe(200);

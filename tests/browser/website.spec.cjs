@@ -331,13 +331,28 @@ test('manual order form persists actual fields and HTML-like notes render as ine
 });
 
 test('multiple rider stops can be expanded and unavailable rider selection is rejected',async({page})=>{
-  const first=await create(page,{pin:true});await assignDispatch(page);
-  const second=await create(page,{pin:true});await assignDispatch(page);
-  await page.locator('.role-switch a[href="#/rider"]').click();
+  const first=await create(page,{pin:true}),second=await create(page,{pin:true});
+  // Set up an explicit two-stop batch using the real, supported route API.
+  const boot=(await (await page.request.get('/dashboard/bootstrap')).json());
+  const call=async(method,path,body)=>{
+    const response=await page.request.post('/dashboard/api',{headers:{Origin:new URL(page.url()).origin,'X-Dashboard-CSRF':boot.csrf},data:{method,path,body,actor:'dispatcher'}});
+    expect(response.ok()).toBeTruthy();return (await response.json()).data;
+  };
+  const rider=(await inspect(page,'/api/riders')).items[0];
+  let route=await call('POST','/api/routes',{rider_id:rider.id,day:new Date(Date.now()+23400000).toISOString().slice(0,10)});
+  for(const [sequence,id] of [first,second].entries()){
+    let row=await inspect(page,'/api/orders/'+id);
+    row=await call('POST',`/api/orders/${id}/operations`,{expected_version:row.version,action:'RECEIVE'});
+    for(const status of ['NEEDS_REVIEW','CONFIRMED','READY_FOR_DISPATCH'])row=await call('PATCH',`/api/orders/${id}/status`,{expected_version:row.version,status,acknowledge_unverified_location:true});
+    await call('POST',`/api/orders/${id}/assign`,{expected_version:row.version,rider_id:rider.id,route_id:route.id,stop_sequence:sequence+1});
+  }
+  route=(await inspect(page,'/api/routes')).items.find(item=>item.id===route.id);
+  await call('POST',`/api/routes/${route.id}/actions`,{request_id:crypto.randomUUID(),expected_version:route.version,action:'DISPATCH'});
+  await page.goto('/api.html#/rider');await page.reload();
   await page.locator('#connect-form [name=actor_id]').fill('00000000-0000-0000-0000-000000000000');
   await page.locator('#connect-form button[type=submit]').click();
   await expect(page.locator('#api-status')).toHaveClass(/error/);
-  await page.locator('#connect-form [name=actor_id]').fill('');await page.locator('#connect-form button[type=submit]').click();
+  await page.locator('#connect-form [name=actor_id]').fill(rider.id);await page.locator('#connect-form button[type=submit]').click();
   await expect(page.locator('.current-stop')).toBeVisible();
   await page.locator('.remaining-stops > summary').click();
   await expect(page.locator(`.remaining-stops [data-action=deliver]`)).toBeVisible();
@@ -392,9 +407,7 @@ test('parcel incident resolution and draft unassignment use persistent workflow 
   await page.locator('[data-action=resolve-incident]').click();
   await page.locator('dialog [name=reason]').fill('Fictional packaging inspected and resolved');
   await page.locator('dialog button[type=submit]').click();
-  const form=page.locator('#auto-assignment-form');await expect(form).toBeVisible();
-  await form.locator('[name=received]').check();await form.locator('[name=ack]').check();
-  await form.locator('button[type=submit]').click();
+  await assignDispatch(page,{accept:false});
   await expect(page.locator('[data-action=unassign]')).toBeVisible();
   expect((await inspect(page,'/api/orders/'+id)).status).toBe('ASSIGNED');
   await page.locator('[data-action=unassign]').click();
@@ -408,13 +421,13 @@ test('failed parcel requires physical return before zero-cash route closeout',as
   await page.locator('[data-action=failed]').click();await page.locator('dialog button[type=submit]').click();
   await expect(page.locator('[data-action=failed]')).toHaveCount(0);
   await expect(page.locator('[data-action=handover]')).toHaveCount(0);
-  await page.locator('.role-switch a[href="#/admin"]').click();
+  await enter(page,'admin');
   await page.locator('[data-action=return]').click();
   await expect(page.locator('[data-action=return]')).toHaveCount(0);
   expect((await inspect(page,'/api/orders/'+id)).parsing_metadata.parcel.return_received_at).toBeTruthy();
-  await page.locator('.role-switch a[href="#/rider"]').click();
+  await enter(page,'rider');
   await page.locator('[data-action=handover]').click();await expect(page.locator('#api-status')).toContainText('Handover submitted');
-  await page.locator('.role-switch a[href="#/admin"]').click();
+  await enter(page,'admin');
   await page.locator('[data-action=receipt]').click();await page.locator('dialog [name=amount]').fill('0');
   await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   expect((await inspect(page,'/api/routes')).items[0].state).toBe('closed');

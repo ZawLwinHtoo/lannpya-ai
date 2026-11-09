@@ -130,7 +130,7 @@ async function approve(page,id){
     await expect(page.locator('#edit-api-form')).toBeVisible();
   }
 }
-async function assignDispatch(page){
+async function assignDispatch(page,{accept=true}={}){
   const orderId=new URL(page.url()).hash.split('/').at(-1);
   // Record a real verified availability response before using automatic allocation.
   const boot=await (await page.request.get('/dashboard/bootstrap')).json();
@@ -155,6 +155,7 @@ async function assignDispatch(page){
   await expect(page.locator('#api-status')).toContainText(/offer sent|waiting/i);
   const offers=(await inspect(page,`/api/orders/${orderId}/assignments?page=1&page_size=100`)).items;
   const offer=offers.at(-1);if(!offer)throw Error('Automatic assignment did not create an offer.');
+  if(!accept)return offer.rider_id;
   await enter(page,'rider',offer.rider_id);await expect(page.locator('[data-action=accept-offer]')).toBeVisible();
   await page.locator('[data-action=accept-offer]').click();await expect(page.locator('#api-status')).not.toHaveClass(/error/);
   await enter(page,'admin');await page.goto('/api.html#/order/'+orderId);
