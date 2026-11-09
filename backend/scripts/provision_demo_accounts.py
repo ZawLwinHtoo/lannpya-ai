@@ -1,8 +1,10 @@
 import json
 import uuid
+
+from sqlalchemy import text
+
 from app.core.config import Settings
 from app.db.session import Database
-from sqlalchemy import text
 
 DEMO_ACCOUNTS = [
     {
@@ -21,6 +23,7 @@ DEMO_ACCOUNTS = [
     },
 ]
 
+
 def provision_demo_accounts():
     s = Settings()
     db = Database(s.database_url.get_secret_value())
@@ -33,8 +36,7 @@ def provision_demo_accounts():
             shop_name = acc["shop_name"]
 
             existing_auth = session.execute(
-                text("SELECT id FROM auth.users WHERE email = :email"),
-                {"email": email}
+                text("SELECT id FROM auth.users WHERE email = :email"), {"email": email}
             ).scalar()
 
             if existing_auth:
@@ -55,24 +57,23 @@ def provision_demo_accounts():
                             updated_at = NOW()
                         WHERE id = :id
                     """),
-                    {"pwd": pwd, "id": uid}
+                    {"pwd": pwd, "id": uid},
                 )
                 print(f"Updated auth password for {email} ({uid})")
             else:
                 uid = uuid.uuid4()
-                user_meta = json.dumps({
-                    "sub": str(uid),
-                    "name": name,
-                    "shop_name": shop_name,
-                    "role": role,
-                    "email": email,
-                    "email_verified": True,
-                    "phone_verified": False,
-                })
-                app_meta = json.dumps({
-                    "provider": "email",
-                    "providers": ["email"]
-                })
+                user_meta = json.dumps(
+                    {
+                        "sub": str(uid),
+                        "name": name,
+                        "shop_name": shop_name,
+                        "role": role,
+                        "email": email,
+                        "email_verified": True,
+                        "phone_verified": False,
+                    }
+                )
+                app_meta = json.dumps({"provider": "email", "providers": ["email"]})
 
                 session.execute(
                     text("""
@@ -98,7 +99,7 @@ def provision_demo_accounts():
                         "pwd": pwd,
                         "app_meta": app_meta,
                         "user_meta": user_meta,
-                    }
+                    },
                 )
 
                 identity_id = uuid.uuid4()
@@ -118,14 +119,13 @@ def provision_demo_accounts():
                         "user_id": uid,
                         "user_id_str": str(uid),
                         "user_meta": user_meta,
-                    }
+                    },
                 )
                 print(f"Created auth user and identity for {email} ({uid})")
 
             # Ensure public.users entry
             existing_pub = session.execute(
-                text("SELECT id FROM public.users WHERE id = :id"),
-                {"id": uid}
+                text("SELECT id FROM public.users WHERE id = :id"), {"id": uid}
             ).scalar()
 
             if existing_pub:
@@ -135,7 +135,7 @@ def provision_demo_accounts():
                         SET name = :name, email = :email, role = :role, updated_at = NOW()
                         WHERE id = :id
                     """),
-                    {"id": uid, "name": name, "email": email, "role": role}
+                    {"id": uid, "name": name, "email": email, "role": role},
                 )
                 print(f"Updated public.users for {email} ({role})")
             else:
@@ -144,14 +144,13 @@ def provision_demo_accounts():
                         INSERT INTO public.users (id, name, email, role, created_at, updated_at)
                         VALUES (:id, :name, :email, :role, NOW(), NOW())
                     """),
-                    {"id": uid, "name": name, "email": email, "role": role}
+                    {"id": uid, "name": name, "email": email, "role": role},
                 )
                 print(f"Inserted public.users for {email} ({role})")
 
             if role == "Rider":
                 existing_profile = session.execute(
-                    text("SELECT id FROM public.rider_profiles WHERE id = :id"),
-                    {"id": uid}
+                    text("SELECT id FROM public.rider_profiles WHERE id = :id"), {"id": uid}
                 ).scalar()
                 if not existing_profile:
                     session.execute(
@@ -159,14 +158,19 @@ def provision_demo_accounts():
                             INSERT INTO public.rider_profiles (id, operational_status, contact_phone, version, queue_version, created_at, updated_at)
                             VALUES (:id, 'AVAILABLE', '+959421177832', 1, 0, NOW(), NOW())
                         """),
-                        {"id": uid}
+                        {"id": uid},
                     )
                     print(f"Inserted public.rider_profiles for {email}")
-        users = session.execute(
-            text("SELECT id, name, email, role FROM public.users ORDER BY created_at ASC")
-        ).mappings().all()
+        users = (
+            session.execute(
+                text("SELECT id, name, email, role FROM public.users ORDER BY created_at ASC")
+            )
+            .mappings()
+            .all()
+        )
         for u in users:
             print(dict(u))
+
 
 if __name__ == "__main__":
     provision_demo_accounts()

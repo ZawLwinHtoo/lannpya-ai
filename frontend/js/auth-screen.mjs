@@ -6,7 +6,8 @@ export async function startAuthentication(runtime){
   const root=document.querySelector('#app');
   let config;
   try{config=publicAuthConfig(runtime);}catch{
-    root.innerHTML='<main class="auth-setup panel"><img src="assets/brand/mark-dark.svg" width="48" height="48" alt="LannPya"><h1>Sign-in is being set up</h1><p>Your hub needs to connect its account service. Please try again after setup is complete.</p><button class="btn primary" onclick="location.reload()">Try again</button></main>';
+    root.innerHTML='<main class="auth-setup panel"><img src="assets/brand/mark-dark.svg" width="48" height="48" alt="LannPya"><h1>Sign-in is being set up</h1><p>Your hub needs to connect its account service. Please try again after setup is complete.</p><button class="btn primary" data-reload>Try again</button></main>';
+    root.querySelector('[data-reload]').onclick=()=>location.reload();
     return new Promise(()=>{});
   }
   const {createClient}=await import('../vendor/supabase.mjs');

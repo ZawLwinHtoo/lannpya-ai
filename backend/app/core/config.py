@@ -48,7 +48,9 @@ class Settings(BaseSettings):
     auto_provision_users: bool = Field(
         default=True,
         validation_alias=AliasChoices(
-            "LANNPYA_AUTO_PROVISION_USERS", "AUTO_PROVISION_USERS", "LANNPYA_AUTO_PROVISION_DISPATCHERS"
+            "LANNPYA_AUTO_PROVISION_USERS",
+            "AUTO_PROVISION_USERS",
+            "LANNPYA_AUTO_PROVISION_DISPATCHERS",
         ),
     )
 
@@ -88,12 +90,18 @@ class Settings(BaseSettings):
         if self.environment == "production":
             if self.buyer_otp_mode != "twilio" or not self.buyer_otp_external_sends_enabled:
                 raise ValueError("Production requires explicitly enabled Twilio Verify")
-            if not (self.buyer_twilio_account_sid and self.buyer_twilio_auth_token and self.buyer_twilio_verify_service_sid):
+            if not (
+                self.buyer_twilio_account_sid
+                and self.buyer_twilio_auth_token
+                and self.buyer_twilio_verify_service_sid
+            ):
                 raise ValueError("Production Twilio Verify credentials are required")
         if self.buyer_reminder_external_sends_enabled:
             if not (self.buyer_twilio_account_sid and self.buyer_twilio_auth_token):
                 raise ValueError("Buyer reminder SMS requires Twilio Messaging credentials")
-            if bool(self.buyer_twilio_messaging_service_sid) == bool(self.buyer_twilio_message_from):
+            if bool(self.buyer_twilio_messaging_service_sid) == bool(
+                self.buyer_twilio_message_from
+            ):
                 raise ValueError("Configure exactly one Twilio Messaging Service SID or sender")
         return self
 

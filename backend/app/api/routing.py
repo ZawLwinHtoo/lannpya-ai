@@ -115,8 +115,7 @@ def plans(
     query = planning.scoped_plans(session, actor)
     total = session.scalar(select(func.count()).select_from(query.subquery()))
     records = session.scalars(
-        query
-        .order_by(RoutingPlan.created_at.desc(), RoutingPlan.id)
+        query.order_by(RoutingPlan.created_at.desc(), RoutingPlan.id)
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
@@ -161,13 +160,14 @@ def rider_plans(rider_id: UUID, request: Request, session: SessionDep, actor: Ri
     )
     if actor.role != UserRole.RIDER:
         own += (RoutingPlan.actor_id == actor.id,)
-    query = (select(RoutingPlan) if actor.role == UserRole.RIDER
-             else planning.scoped_plans(session, actor)).where(*own)
+    query = (
+        select(RoutingPlan)
+        if actor.role == UserRole.RIDER
+        else planning.scoped_plans(session, actor)
+    ).where(*own)
     total = session.scalar(select(func.count()).select_from(query.subquery()))
     records = session.scalars(
-        query
-        .order_by(RoutingPlan.created_at.desc(), RoutingPlan.id)
-        .limit(20)
+        query.order_by(RoutingPlan.created_at.desc(), RoutingPlan.id).limit(20)
     )
     items = [planning.output(session, p, request.app.state.settings, rider_id) for p in records]
     return {"items": items, "total": total, "page": 1, "page_size": 20}

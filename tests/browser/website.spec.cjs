@@ -64,13 +64,11 @@ test('complete browser-only order, buyer, approval, rider COD and hub closeout j
   await expect(page.locator('[data-action=deliver]')).toHaveCount(0);
   await page.locator('[data-action=accept-offer]').click();
   await expect(page.locator('[data-action=accept-offer]')).toHaveCount(0);
-  await expect(page.locator('[data-action=deliver]')).toHaveCount(0);
+  await expect(page.locator('[data-action=deliver]')).toBeVisible();
   await page.setViewportSize({width:390,height:844});await shot(page,'rider-accepted-mobile');
   await page.setViewportSize({width:1440,height:900});
   await enter(page,'admin');await page.goto('/api.html#/order/'+id);
-  await expect(page.locator('[data-action=dispatch]')).toBeVisible();
-  await page.locator('[data-action=dispatch]').click();await page.locator('dialog button[type=submit]').click();
-  await expect(page.locator('dialog')).toHaveCount(0);
+  await expect(page.locator('[data-action=dispatch]')).toHaveCount(0);
   order=await inspect(page,'/api/orders/'+id);expect(order.status).toBe('OUT_FOR_DELIVERY');
   const riderId=replacement.rider_id;
   await shot(page,'admin-departed-desktop');
@@ -197,8 +195,7 @@ test('buyer invalid coordinates, instructions, rescheduling and rejection remain
 
 test('rider failure, cancellation of modal, refresh and physical return requirement',async({page})=>{
   const id=await create(page,{pin:true});await assignDispatch(page);
-  await page.locator('.role-switch a[href="#/rider"]').click();
-  await page.locator('#connect-form button[type=submit]').click();
+  await enter(page,'rider');
   await page.locator('[data-action=deliver]').click();await page.locator('dialog [data-cancel]').click();
   expect((await inspect(page,'/api/orders/'+id)).status).toBe('OUT_FOR_DELIVERY');
   await page.locator('[data-action=failed]').click();
@@ -215,8 +212,7 @@ test('rider failure, cancellation of modal, refresh and physical return requirem
 
 test('rider navigation waits for a pending dispatch refresh before connecting',async({page})=>{
   const id=await create(page,{pin:true});await assignDispatch(page);
-  await page.locator('.role-switch a[href="#/rider"]').click();
-  await page.locator('#connect-form button[type=submit]').click();
+  await enter(page,'rider');
   await expect(page.locator('.current-stop')).toBeVisible();
   expect((await inspect(page,'/api/orders/'+id)).status).toBe('OUT_FOR_DELIVERY');
 });
@@ -258,23 +254,17 @@ for(const [width,height] of [[1440,900],[1366,768],[768,1024],[390,844],[360,740
   await buyer.locator('#buyer-location-form button[type=submit]').click();
   await expect(buyer.locator('#api-status')).toContainText('awaiting admin review');
   await approve(page,id);
-  const form=page.locator('#auto-assignment-form');
-  await form.locator('[name=received]').check();await form.locator('[name=ack]').check();
-  await form.locator('button[type=submit]').click();
-  await expect(page.locator('[data-action=dispatch]')).toBeVisible();
-  await page.locator('[data-action=dispatch]').click();
-  const box=await page.locator('dialog').boundingBox();
-  expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width+1);
-  expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(height+1);
-  await shot(page,`departure-modal-${width}`);
-  await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
-  await page.locator('.role-switch a[href="#/rider"]').click();await page.locator('#connect-form button[type=submit]').click();
+  const activeRider=await assignDispatch(page);
+  await enter(page,'rider',activeRider);
   await expect(page.locator('#api-status')).not.toHaveClass(/error/);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
   await expect(page.locator('[data-action=deliver]')).toBeVisible();
   await shot(page,`rider-assigned-${width}`);
   await page.locator('[data-action=deliver]').click();
   await expect(page.locator('dialog [data-cancel]')).toBeInViewport();
+  const box=await page.locator('dialog').boundingBox();
+  expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width+1);
+  expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(height+1);
   await shot(page,`delivery-modal-${width}`);
   await page.locator('dialog [data-cancel]').click();
   expect((await inspect(page,'/api/orders/'+id)).confidence_level).not.toBe('GREEN');
@@ -341,13 +331,28 @@ test('manual order form persists actual fields and HTML-like notes render as ine
 });
 
 test('multiple rider stops can be expanded and unavailable rider selection is rejected',async({page})=>{
-  const first=await create(page,{pin:true});await assignDispatch(page);
-  const second=await create(page,{pin:true});await assignDispatch(page);
-  await page.locator('.role-switch a[href="#/rider"]').click();
+  const first=await create(page,{pin:true}),second=await create(page,{pin:true});
+  // Set up an explicit two-stop batch using the real, supported route API.
+  const boot=(await (await page.request.get('/dashboard/bootstrap')).json());
+  const call=async(method,path,body)=>{
+    const response=await page.request.post('/dashboard/api',{headers:{Origin:new URL(page.url()).origin,'X-Dashboard-CSRF':boot.csrf},data:{method,path,body,actor:'dispatcher'}});
+    expect(response.ok()).toBeTruthy();return (await response.json()).data;
+  };
+  const rider=(await inspect(page,'/api/riders')).items[0];
+  let route=await call('POST','/api/routes',{rider_id:rider.id,day:new Date(Date.now()+23400000).toISOString().slice(0,10)});
+  for(const [sequence,id] of [first,second].entries()){
+    let row=await inspect(page,'/api/orders/'+id);
+    row=await call('POST',`/api/orders/${id}/operations`,{expected_version:row.version,action:'RECEIVE'});
+    for(const status of ['NEEDS_REVIEW','CONFIRMED','READY_FOR_DISPATCH'])row=await call('PATCH',`/api/orders/${id}/status`,{expected_version:row.version,status,acknowledge_unverified_location:true});
+    await call('POST',`/api/orders/${id}/assign`,{expected_version:row.version,rider_id:rider.id,route_id:route.id,stop_sequence:sequence+1});
+  }
+  route=(await inspect(page,'/api/routes')).items.find(item=>item.id===route.id);
+  await call('POST',`/api/routes/${route.id}/actions`,{request_id:crypto.randomUUID(),expected_version:route.version,action:'DISPATCH'});
+  await page.goto('/api.html#/rider');await page.reload();
   await page.locator('#connect-form [name=actor_id]').fill('00000000-0000-0000-0000-000000000000');
   await page.locator('#connect-form button[type=submit]').click();
   await expect(page.locator('#api-status')).toHaveClass(/error/);
-  await page.locator('#connect-form [name=actor_id]').fill('');await page.locator('#connect-form button[type=submit]').click();
+  await page.locator('#connect-form [name=actor_id]').fill(rider.id);await page.locator('#connect-form button[type=submit]').click();
   await expect(page.locator('.current-stop')).toBeVisible();
   await page.locator('.remaining-stops > summary').click();
   await expect(page.locator(`.remaining-stops [data-action=deliver]`)).toBeVisible();
@@ -402,9 +407,7 @@ test('parcel incident resolution and draft unassignment use persistent workflow 
   await page.locator('[data-action=resolve-incident]').click();
   await page.locator('dialog [name=reason]').fill('Fictional packaging inspected and resolved');
   await page.locator('dialog button[type=submit]').click();
-  const form=page.locator('#auto-assignment-form');await expect(form).toBeVisible();
-  await form.locator('[name=received]').check();await form.locator('[name=ack]').check();
-  await form.locator('button[type=submit]').click();
+  await assignDispatch(page,{accept:false});
   await expect(page.locator('[data-action=unassign]')).toBeVisible();
   expect((await inspect(page,'/api/orders/'+id)).status).toBe('ASSIGNED');
   await page.locator('[data-action=unassign]').click();
@@ -414,17 +417,17 @@ test('parcel incident resolution and draft unassignment use persistent workflow 
 
 test('failed parcel requires physical return before zero-cash route closeout',async({page})=>{
   const id=await create(page,{pin:true});await assignDispatch(page);
-  await page.locator('.role-switch a[href="#/rider"]').click();await page.locator('#connect-form button[type=submit]').click();
+  await enter(page,'rider');
   await page.locator('[data-action=failed]').click();await page.locator('dialog button[type=submit]').click();
   await expect(page.locator('[data-action=failed]')).toHaveCount(0);
   await expect(page.locator('[data-action=handover]')).toHaveCount(0);
-  await page.locator('.role-switch a[href="#/admin"]').click();
+  await enter(page,'admin');
   await page.locator('[data-action=return]').click();
   await expect(page.locator('[data-action=return]')).toHaveCount(0);
   expect((await inspect(page,'/api/orders/'+id)).parsing_metadata.parcel.return_received_at).toBeTruthy();
-  await page.locator('.role-switch a[href="#/rider"]').click();
+  await enter(page,'rider');
   await page.locator('[data-action=handover]').click();await expect(page.locator('#api-status')).toContainText('Handover submitted');
-  await page.locator('.role-switch a[href="#/admin"]').click();
+  await enter(page,'admin');
   await page.locator('[data-action=receipt]').click();await page.locator('dialog [name=amount]').fill('0');
   await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   expect((await inspect(page,'/api/routes')).items[0].state).toBe('closed');

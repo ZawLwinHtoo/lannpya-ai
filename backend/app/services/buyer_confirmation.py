@@ -10,8 +10,13 @@ from sqlalchemy import select, update
 
 from app.core.order_errors import OrderAPIError
 from app.db.buyer_models import (
-    BuyerEditPolicy, BuyerOtpChallenge, BuyerRequest, BuyerSession,
-    BuyerSubmissionReceipt, ConfirmationLink, LocationReference,
+    BuyerEditPolicy,
+    BuyerOtpChallenge,
+    BuyerRequest,
+    BuyerSession,
+    BuyerSubmissionReceipt,
+    ConfirmationLink,
+    LocationReference,
 )
 from app.db.models import DeliveryEvent, Order, utcnow
 from app.domain.lifecycle import OrderStatus, UserRole
@@ -62,7 +67,10 @@ def delivery_link_policy(session, order):
         )
         session.execute(
             update(BuyerOtpChallenge)
-            .where(BuyerOtpChallenge.link_id.in_(active_link_ids), BuyerOtpChallenge.status == "PENDING")
+            .where(
+                BuyerOtpChallenge.link_id.in_(active_link_ids),
+                BuyerOtpChallenge.status == "PENDING",
+            )
             .values(status="REVOKED", demo_code=None)
         )
         session.execute(
@@ -81,7 +89,10 @@ def delivery_link_policy(session, order):
         )
         session.execute(
             update(BuyerOtpChallenge)
-            .where(BuyerOtpChallenge.link_id.in_(active_link_ids), BuyerOtpChallenge.status == "PENDING")
+            .where(
+                BuyerOtpChallenge.link_id.in_(active_link_ids),
+                BuyerOtpChallenge.status == "PENDING",
+            )
             .values(status="REVOKED", demo_code=None)
         )
         session.execute(
@@ -153,7 +164,9 @@ class BuyerConfirmationService:
         )
         self.session.execute(
             update(BuyerOtpChallenge)
-            .where(BuyerOtpChallenge.link_id.in_(old_link_ids), BuyerOtpChallenge.status == "PENDING")
+            .where(
+                BuyerOtpChallenge.link_id.in_(old_link_ids), BuyerOtpChallenge.status == "PENDING"
+            )
             .values(status="REVOKED", demo_code=None)
         )
         self.session.execute(
@@ -193,7 +206,10 @@ class BuyerConfirmationService:
         )
         self.session.execute(
             update(BuyerOtpChallenge)
-            .where(BuyerOtpChallenge.link_id.in_(active_link_ids), BuyerOtpChallenge.status == "PENDING")
+            .where(
+                BuyerOtpChallenge.link_id.in_(active_link_ids),
+                BuyerOtpChallenge.status == "PENDING",
+            )
             .values(status="REVOKED", demo_code=None)
         )
         result = self.session.execute(
@@ -240,11 +256,14 @@ class BuyerConfirmationService:
             if o.parsing_metadata and isinstance(o.parsing_metadata, dict):
                 parcel_ref = str(o.parsing_metadata.get("parcel", {}).get("reference") or "")
             ref_match = bool(
-                parcel_ref and (parcel_ref.lower() == tid.lower() or parcel_ref.lower() == core_id.lower())
+                parcel_ref
+                and (parcel_ref.lower() == tid.lower() or parcel_ref.lower() == core_id.lower())
             )
 
             if id_match or ref_match:
-                o_digits = re.sub(r"[၀-၉]", lambda m: str(ord(m.group(0)) - 0x1040), o.customer_phone or "")
+                o_digits = re.sub(
+                    r"[၀-၉]", lambda m: str(ord(m.group(0)) - 0x1040), o.customer_phone or ""
+                )
                 o_phone = re.sub(r"\D", "", o_digits)
                 if o_phone.startswith("9509"):
                     o_phone = "09" + o_phone[4:]
@@ -263,11 +282,13 @@ class BuyerConfirmationService:
             raise OrderAPIError(
                 404,
                 "ORDER_NOT_FOUND",
-                "No delivery found matching this Tracking ID and phone number. Check your order reference and phone number.",
+                "No delivery found matching this Tracking ID and phone number. Check your order reference and phone number.",  # noqa: E501 — preserve literal message or SQL
             )
 
         if matched_order.status == OrderStatus.CANCELLED:
-            raise OrderAPIError(410, "DELIVERY_CANCELLED", "This delivery was cancelled. Contact the shop.")
+            raise OrderAPIError(
+                410, "DELIVERY_CANCELLED", "This delivery was cancelled. Contact the shop."
+            )
 
         now = utcnow()
         # Only hashes are stored, so an existing link's raw token cannot be
@@ -383,8 +404,10 @@ class BuyerConfirmationService:
                 423, "CONFIRMATION_LOCKED", "Confirmation is locked; contact the shop."
             )
         mutable_statuses = PRE_DISPATCH | {
-            OrderStatus.DRAFT, OrderStatus.READY_FOR_DISPATCH,
-            OrderStatus.ASSIGNED, OrderStatus.OUT_FOR_DELIVERY,
+            OrderStatus.DRAFT,
+            OrderStatus.READY_FOR_DISPATCH,
+            OrderStatus.ASSIGNED,
+            OrderStatus.OUT_FOR_DELIVERY,
         }
         if order.status not in mutable_statuses:
             raise OrderAPIError(
@@ -392,19 +415,27 @@ class BuyerConfirmationService:
             )
         policy = self.session.get(BuyerEditPolicy, order.id)
         if order.status in {
-            OrderStatus.READY_FOR_DISPATCH, OrderStatus.ASSIGNED, OrderStatus.OUT_FOR_DELIVERY
-        } and (
-            policy is None or policy.initial_submitted_at is None or policy.cutoff_at is None
-        ):
-            raise OrderAPIError(409, "CONCRETE_WINDOW_REQUIRED", "A confirmed delivery window is required before assigned-order edits.")
+            OrderStatus.READY_FOR_DISPATCH,
+            OrderStatus.ASSIGNED,
+            OrderStatus.OUT_FOR_DELIVERY,
+        } and (policy is None or policy.initial_submitted_at is None or policy.cutoff_at is None):
+            raise OrderAPIError(
+                409,
+                "CONCRETE_WINDOW_REQUIRED",
+                "A confirmed delivery window is required before assigned-order edits.",
+            )
         # The cutoff limits amendments, never the buyer's first address confirmation.
         if policy is not None and policy.initial_submitted_at is not None:
             now = utcnow()
             if policy.closed_at is not None or policy.edit_count >= 3:
-                raise OrderAPIError(409, "BUYER_EDITS_EXHAUSTED", "The three allowed edits have been used.")
+                raise OrderAPIError(
+                    409, "BUYER_EDITS_EXHAUSTED", "The three allowed edits have been used."
+                )
             if policy.cutoff_at is not None and now >= policy.cutoff_at:
                 policy.closed_at = now
-                raise OrderAPIError(409, "BUYER_EDIT_CUTOFF_PASSED", "The delivery change cutoff has passed.")
+                raise OrderAPIError(
+                    409, "BUYER_EDIT_CUTOFF_PASSED", "The delivery change cutoff has passed."
+                )
 
     def verify(self, token, body):
         from app.services.buyer_otp import BuyerOtpService
@@ -419,7 +450,9 @@ class BuyerConfirmationService:
         lock_allocator(self.session)
         link, order, _ = self.link(token, mutate=True)
         if link.locked_at or link.failed_attempts >= 3:
-            raise OrderAPIError(423, "CONFIRMATION_LOCKED", "Confirmation is locked; contact the shop.")
+            raise OrderAPIError(
+                423, "CONFIRMATION_LOCKED", "Confirmation is locked; contact the shop."
+            )
         if not credential or not re.fullmatch(r"[A-Za-z0-9_-]{43}", credential):
             raise OrderAPIError(
                 401, "BUYER_AUTHORIZATION_REQUIRED", "Valid buyer authorization is required."
@@ -437,7 +470,9 @@ class BuyerConfirmationService:
                 401, "BUYER_AUTHORIZATION_REQUIRED", "Valid buyer authorization is required."
             )
         if order.status == OrderStatus.DELIVERED:
-            raise OrderAPIError(409, "BUYER_DETAILS_CLOSED", "Delivered order details are view-only.")
+            raise OrderAPIError(
+                409, "BUYER_DETAILS_CLOSED", "Delivered order details are view-only."
+            )
         return link, order
 
     def details(self, token, credential):
@@ -501,20 +536,26 @@ class BuyerConfirmationService:
                     start = None
             except ValueError:
                 start = None
-        cutoff = policy.cutoff_at if policy and policy.cutoff_at else (
-            start - timedelta(hours=1) if start else None
+        cutoff = (
+            policy.cutoff_at
+            if policy and policy.cutoff_at
+            else (start - timedelta(hours=1) if start else None)
         )
         used = policy.edit_count if policy else 0
         initial_submitted = bool(policy and policy.initial_submitted_at)
         now = utcnow()
         terminal = order.status in {OrderStatus.DELIVERED, OrderStatus.CANCELLED}
         reason = (
-            "ORDER_TERMINAL" if terminal else
-            "EDITS_EXHAUSTED" if used >= 3 else
-            "NO_CONCRETE_WINDOW" if initial_submitted and cutoff is None else
-            "CUTOFF_PASSED" if initial_submitted and (
-                (policy and policy.closed_at) or cutoff is not None and now >= cutoff
-            ) else None
+            "ORDER_TERMINAL"
+            if terminal
+            else "EDITS_EXHAUSTED"
+            if used >= 3
+            else "NO_CONCRETE_WINDOW"
+            if initial_submitted and cutoff is None
+            else "CUTOFF_PASSED"
+            if initial_submitted
+            and ((policy and policy.closed_at) or cutoff is not None and now >= cutoff)
+            else None
         )
         return {
             "editable": reason is None,
@@ -537,7 +578,9 @@ class BuyerConfirmationService:
         receipt = self.session.get(BuyerSubmissionReceipt, (order.id, body.request_id))
         if receipt is not None:
             if receipt.payload_hash != payload_hash:
-                raise OrderAPIError(409, "BUYER_REQUEST_CONFLICT", "Request ID was already used for different data.")
+                raise OrderAPIError(
+                    409, "BUYER_REQUEST_CONFLICT", "Request ID was already used for different data."
+                )
             self.session.commit()
             return receipt.response_body
 
@@ -549,57 +592,101 @@ class BuyerConfirmationService:
         window = f"{start.isoformat()}/{end.isoformat()}"
         window_changed = window != order.delivery_time_window
         if (
-            not initial and window_changed and start <= now + timedelta(hours=1)
+            not initial
+            and window_changed
+            and start <= now + timedelta(hours=1)
             or start.astimezone(YANGON).date() < now.astimezone(YANGON).date()
             or end > now + timedelta(days=self.settings.buyer_max_schedule_days)
             or start.astimezone(YANGON).date() != end.astimezone(YANGON).date()
         ):
-            raise OrderAPIError(422, "INVALID_DELIVERY_WINDOW", "Time window must satisfy notice, scheduling, and Yangon-day limits.")
+            raise OrderAPIError(
+                422,
+                "INVALID_DELIVERY_WINDOW",
+                "Time window must satisfy notice, scheduling, and Yangon-day limits.",
+            )
         if policy is not None and not initial:
             if policy.closed_at or policy.edit_count >= 3:
-                raise OrderAPIError(409, "BUYER_EDITS_EXHAUSTED", "The three allowed edits have been used.")
+                raise OrderAPIError(
+                    409, "BUYER_EDITS_EXHAUSTED", "The three allowed edits have been used."
+                )
             if policy.cutoff_at is not None and now >= policy.cutoff_at:
                 policy.closed_at = now
                 self.session.commit()
-                raise OrderAPIError(409, "BUYER_EDIT_CUTOFF_PASSED", "The delivery change cutoff has passed.")
+                raise OrderAPIError(
+                    409, "BUYER_EDIT_CUTOFF_PASSED", "The delivery change cutoff has passed."
+                )
             if policy.cutoff_at is None and not order.delivery_time_window:
-                raise OrderAPIError(409, "CONCRETE_WINDOW_REQUIRED", "A concrete delivery window must be confirmed before edits can be enabled.")
+                raise OrderAPIError(
+                    409,
+                    "CONCRETE_WINDOW_REQUIRED",
+                    "A concrete delivery window must be confirmed before edits can be enabled.",
+                )
 
         reference = self.session.get(LocationReference, order.id)
         reasons = []
         if reference is None:
             if initial and not body.initial_pin_acknowledged:
-                raise OrderAPIError(409, "INITIAL_PIN_ACKNOWLEDGEMENT_REQUIRED", "Initial pin submission requires acknowledgement of dispatcher review.")
+                raise OrderAPIError(
+                    409,
+                    "INITIAL_PIN_ACKNOWLEDGEMENT_REQUIRED",
+                    "Initial pin submission requires acknowledgement of dispatcher review.",
+                )
             reasons.append("INITIAL_PIN_REQUIRES_REVIEW")
         else:
             target = self.boundaries.township_at(body.latitude, body.longitude)
             origin = self.boundaries.township_at(reference.latitude, reference.longitude)
-            if origin != reference.township or reference.township != order.township or target is None:
+            if (
+                origin != reference.township
+                or reference.township != order.township
+                or target is None
+            ):
                 reasons.append("TOWNSHIP_BOUNDARY_UNVERIFIED")
             elif target != reference.township:
                 reasons.append("CROSS_TOWNSHIP_APPROVAL_REQUIRED")
-            elif distance_meters(reference.latitude, reference.longitude, body.latitude, body.longitude) > 500:
+            elif (
+                distance_meters(
+                    reference.latitude, reference.longitude, body.latitude, body.longitude
+                )
+                > 500
+            ):
                 reasons.append("ZONE_2_RESCHEDULE_REVIEW_REQUIRED")
         assigned = order.status in {OrderStatus.ASSIGNED, OrderStatus.OUT_FOR_DELIVERY}
         if assigned and window != order.delivery_time_window:
-            raise OrderAPIError(409, "ASSIGNED_WINDOW_LOCKED", "The delivery date and window cannot change after assignment.")
+            raise OrderAPIError(
+                409,
+                "ASSIGNED_WINDOW_LOCKED",
+                "The delivery date and window cannot change after assignment.",
+            )
         if assigned:
             reasons.append("ASSIGNED_CHANGE_REVIEW_REQUIRED")
         if body.action == "RESCHEDULE" and not self.settings.buyer_rescheduling_enabled:
             reasons.append("COURIER_RESCHEDULING_REVIEW_REQUIRED")
-        if body.action == "LEAVE_WITH_SECURITY" and not self.settings.buyer_leave_with_security_enabled:
+        if (
+            body.action == "LEAVE_WITH_SECURITY"
+            and not self.settings.buyer_leave_with_security_enabled
+        ):
             reasons.append("LEAVE_WITH_SECURITY_REVIEW_REQUIRED")
         if body.action == "AVAILABLE" and order.confidence_level == "RED":
             reasons.append("ORDER_VALIDATION_REVIEW_REQUIRED")
-        location_reasons = [r for r in reasons if r not in {
-            "COURIER_RESCHEDULING_REVIEW_REQUIRED", "LEAVE_WITH_SECURITY_REVIEW_REQUIRED",
-            "ORDER_VALIDATION_REVIEW_REQUIRED",
-        }]
-        pending = self.session.scalar(select(BuyerRequest.id).where(
-            BuyerRequest.order_id == order.id,
-            BuyerRequest.decision == "REVIEW_REQUIRED",
-            BuyerRequest.resolution.is_(None),
-        ).limit(1))
+        location_reasons = [
+            r
+            for r in reasons
+            if r
+            not in {
+                "COURIER_RESCHEDULING_REVIEW_REQUIRED",
+                "LEAVE_WITH_SECURITY_REVIEW_REQUIRED",
+                "ORDER_VALIDATION_REVIEW_REQUIRED",
+            }
+        ]
+        pending = self.session.scalar(
+            select(BuyerRequest.id)
+            .where(
+                BuyerRequest.order_id == order.id,
+                BuyerRequest.decision == "REVIEW_REQUIRED",
+                BuyerRequest.resolution.is_(None),
+            )
+            .limit(1)
+        )
         if pending:
             reasons.append("PENDING_BUYER_REVIEW")
 
@@ -610,25 +697,41 @@ class BuyerConfirmationService:
             "delivery_instructions": order.delivery_instructions,
         }
         changes = {
-            "latitude": body.latitude, "longitude": body.longitude,
+            "latitude": body.latitude,
+            "longitude": body.longitude,
             "delivery_time_window": window,
         }
         changes["delivery_instructions"] = body.instructions
-        latest = self.session.scalar(select(BuyerRequest).where(
-            BuyerRequest.order_id == order.id, BuyerRequest.kind == "RESPONSE",
-        ).order_by(BuyerRequest.created_at.desc(), BuyerRequest.id.desc()).limit(1))
+        latest = self.session.scalar(
+            select(BuyerRequest)
+            .where(
+                BuyerRequest.order_id == order.id,
+                BuyerRequest.kind == "RESPONSE",
+            )
+            .order_by(BuyerRequest.created_at.desc(), BuyerRequest.id.desc())
+            .limit(1)
+        )
+
         def normalized(values):
             from decimal import Decimal
 
             return {
                 "latitude": Decimal(str(values["latitude"])),
                 "longitude": Decimal(str(values["longitude"])),
-                "time_window": values["time_window"], "action": values["action"],
+                "time_window": values["time_window"],
+                "action": values["action"],
                 "instructions": values.get("instructions") or None,
             }
-        previous_submission = latest.submitted_values if latest and latest.submitted_values.get("atomic_request") else None
-        changed = normalized(payload) != normalized(previous_submission) if previous_submission else any(
-            getattr(order, k) != v for k, v in changes.items()
+
+        previous_submission = (
+            latest.submitted_values
+            if latest and latest.submitted_values.get("atomic_request")
+            else None
+        )
+        changed = (
+            normalized(payload) != normalized(previous_submission)
+            if previous_submission
+            else any(getattr(order, k) != v for k, v in changes.items())
         )
         if not initial and not changed and latest:
             response = self.result(latest, order)
@@ -637,12 +740,22 @@ class BuyerConfirmationService:
             from app.schemas.buyer import BuyerActionResult
 
             response = BuyerActionResult.model_validate(response).model_dump(mode="json")
-            self.session.add(BuyerSubmissionReceipt(order_id=order.id, request_id=body.request_id,
-                link_id=link.id, payload_hash=payload_hash, response_body=response, created_at=now))
+            self.session.add(
+                BuyerSubmissionReceipt(
+                    order_id=order.id,
+                    request_id=body.request_id,
+                    link_id=link.id,
+                    payload_hash=payload_hash,
+                    response_body=response,
+                    created_at=now,
+                )
+            )
             self.session.commit()
             return response
         if not initial and changed and policy.edit_count >= 3:
-            raise OrderAPIError(409, "BUYER_EDITS_EXHAUSTED", "The three allowed edits have been used.")
+            raise OrderAPIError(
+                409, "BUYER_EDITS_EXHAUSTED", "The three allowed edits have been used."
+            )
         if policy is None:
             policy = BuyerEditPolicy(order_id=order.id, edit_count=0)
             self.session.add(policy)
@@ -659,39 +772,61 @@ class BuyerConfirmationService:
 
         # A later complete submission replaces older pending submissions. Keep
         # their audit rows, but do not let out-of-order approvals restore an old pin.
-        old_submissions = self.session.scalars(select(BuyerRequest).where(
-            BuyerRequest.order_id == order.id, BuyerRequest.kind == "RESPONSE",
-            BuyerRequest.decision == "REVIEW_REQUIRED", BuyerRequest.resolution.is_(None),
-        )).all()
-        superseded = {r.request_id for r in old_submissions if r.submitted_values.get("atomic_request")}
+        old_submissions = self.session.scalars(
+            select(BuyerRequest).where(
+                BuyerRequest.order_id == order.id,
+                BuyerRequest.kind == "RESPONSE",
+                BuyerRequest.decision == "REVIEW_REQUIRED",
+                BuyerRequest.resolution.is_(None),
+            )
+        ).all()
+        superseded = {
+            r.request_id for r in old_submissions if r.submitted_values.get("atomic_request")
+        }
         superseded |= {uuid5(key, "location") for key in tuple(superseded)}
         if superseded:
-            for prior in self.session.scalars(select(BuyerRequest).where(
-                BuyerRequest.order_id == order.id, BuyerRequest.request_id.in_(superseded),
-                BuyerRequest.resolution.is_(None),
-            )):
+            for prior in self.session.scalars(
+                select(BuyerRequest).where(
+                    BuyerRequest.order_id == order.id,
+                    BuyerRequest.request_id.in_(superseded),
+                    BuyerRequest.resolution.is_(None),
+                )
+            ):
                 prior.resolution, prior.resolution_reason, prior.resolved_at = (
-                    "REJECT", "Superseded by a newer buyer submission", now,
+                    "REJECT",
+                    "Superseded by a newer buyer submission",
+                    now,
                 )
 
         location_row = BuyerRequest(
-            order_id=order.id, link_id=link.id, request_id=uuid5(body.request_id, "location"),
-            payload_hash=digest("LOCATION" + payload_hash), kind="LOCATION",
+            order_id=order.id,
+            link_id=link.id,
+            request_id=uuid5(body.request_id, "location"),
+            payload_hash=digest("LOCATION" + payload_hash),
+            kind="LOCATION",
             decision="REVIEW_REQUIRED" if location_reasons else "APPLIED",
             reason_codes=location_reasons,
             previous_values={k: old_values[k] for k in ("latitude", "longitude")},
-            submitted_values={"request_id": str(uuid5(body.request_id, "location")),
-                "latitude": payload["latitude"], "longitude": payload["longitude"],
-                "initial_pin_acknowledged": body.initial_pin_acknowledged},
+            submitted_values={
+                "request_id": str(uuid5(body.request_id, "location")),
+                "latitude": payload["latitude"],
+                "longitude": payload["longitude"],
+                "initial_pin_acknowledged": body.initial_pin_acknowledged,
+            },
         )
         self.session.add(location_row)
         if location_reasons and "PENDING_BUYER_REVIEW" not in reasons:
             reasons.append("PENDING_BUYER_REVIEW")
         decision = "REVIEW_REQUIRED" if reasons else "APPLIED"
         row = BuyerRequest(
-            order_id=order.id, link_id=link.id, request_id=body.request_id,
-            payload_hash=payload_hash, kind="RESPONSE", decision=decision,
-            reason_codes=list(dict.fromkeys(reasons)), previous_values=old_values,
+            order_id=order.id,
+            link_id=link.id,
+            request_id=body.request_id,
+            payload_hash=payload_hash,
+            kind="RESPONSE",
+            decision=decision,
+            reason_codes=list(dict.fromkeys(reasons)),
+            previous_values=old_values,
             submitted_values={**payload, "atomic_request": True},
         )
         self.session.add(row)
@@ -709,20 +844,50 @@ class BuyerConfirmationService:
         if reasons:
             order.manual_review_required = True
         metadata = deepcopy(order.parsing_metadata)
-        metadata["buyer_confirmation"] = {"request_id": str(body.request_id), "decision": decision, "kind": "REQUEST"}
+        metadata["buyer_confirmation"] = {
+            "request_id": str(body.request_id),
+            "decision": decision,
+            "kind": "REQUEST",
+        }
         order.parsing_metadata = metadata
-        self.event(order, "BUYER_LOCATION", {"link_id": str(link.id), "request_id": str(body.request_id), "decision": decision, "reason_codes": row.reason_codes}, previous_status)
-        self.event(order, "BUYER_RESPONSE", {"link_id": str(link.id), "request_id": str(body.request_id), "decision": decision, "reason_codes": row.reason_codes}, previous_status)
+        self.event(
+            order,
+            "BUYER_LOCATION",
+            {
+                "link_id": str(link.id),
+                "request_id": str(body.request_id),
+                "decision": decision,
+                "reason_codes": row.reason_codes,
+            },
+            previous_status,
+        )
+        self.event(
+            order,
+            "BUYER_RESPONSE",
+            {
+                "link_id": str(link.id),
+                "request_id": str(body.request_id),
+                "decision": decision,
+                "reason_codes": row.reason_codes,
+            },
+            previous_status,
+        )
         self.session.flush()
         response = self.result(row, order)
         response["editing_policy"] = self.editing_policy(order)
         from app.schemas.buyer import BuyerActionResult
 
         response = BuyerActionResult.model_validate(response).model_dump(mode="json")
-        self.session.add(BuyerSubmissionReceipt(
-            order_id=order.id, request_id=body.request_id, link_id=link.id,
-            payload_hash=payload_hash, response_body=response, created_at=now,
-        ))
+        self.session.add(
+            BuyerSubmissionReceipt(
+                order_id=order.id,
+                request_id=body.request_id,
+                link_id=link.id,
+                payload_hash=payload_hash,
+                response_body=response,
+                created_at=now,
+            )
+        )
         self.session.commit()
         return response
 
@@ -760,9 +925,15 @@ class BuyerConfirmationService:
         now = utcnow()
         if policy is None:
             window = changes.get("delivery_time_window", order.delivery_time_window)
-            start = datetime.fromisoformat(window.split("/", 1)[0]) if window and "/" in window else None
+            start = (
+                datetime.fromisoformat(window.split("/", 1)[0])
+                if window and "/" in window
+                else None
+            )
             policy = BuyerEditPolicy(
-                order_id=order.id, edit_count=0, initial_submitted_at=now,
+                order_id=order.id,
+                edit_count=0,
+                initial_submitted_at=now,
                 cutoff_at=start - timedelta(hours=1) if start else None,
             )
             self.session.add(policy)
@@ -771,14 +942,24 @@ class BuyerConfirmationService:
             split_initial_response = (
                 kind == "RESPONSE"
                 and policy.cutoff_at is None
-                and self.session.scalar(select(BuyerRequest.id).where(
-                    BuyerRequest.order_id == order.id,
-                    BuyerRequest.kind == "RESPONSE",
-                ).limit(1)) is None
-                and self.session.scalar(select(BuyerRequest.id).where(
-                    BuyerRequest.order_id == order.id,
-                    BuyerRequest.kind == "LOCATION",
-                ).limit(1)) is not None
+                and self.session.scalar(
+                    select(BuyerRequest.id)
+                    .where(
+                        BuyerRequest.order_id == order.id,
+                        BuyerRequest.kind == "RESPONSE",
+                    )
+                    .limit(1)
+                )
+                is None
+                and self.session.scalar(
+                    select(BuyerRequest.id)
+                    .where(
+                        BuyerRequest.order_id == order.id,
+                        BuyerRequest.kind == "LOCATION",
+                    )
+                    .limit(1)
+                )
+                is not None
             )
             if material and not split_initial_response:
                 window = changes.get("delivery_time_window", order.delivery_time_window)
@@ -786,18 +967,28 @@ class BuyerConfirmationService:
                 if window and "/" in window:
                     start = datetime.fromisoformat(window.split("/", 1)[0])
                 if start is None:
-                    raise OrderAPIError(409, "CONCRETE_WINDOW_REQUIRED", "Choose a specific delivery window before editing.")
+                    raise OrderAPIError(
+                        409,
+                        "CONCRETE_WINDOW_REQUIRED",
+                        "Choose a specific delivery window before editing.",
+                    )
                 if policy.cutoff_at is not None and now >= policy.cutoff_at:
-                    raise OrderAPIError(409, "BUYER_EDIT_CUTOFF_PASSED", "The delivery change cutoff has passed.")
+                    raise OrderAPIError(
+                        409, "BUYER_EDIT_CUTOFF_PASSED", "The delivery change cutoff has passed."
+                    )
                 if policy.edit_count >= 3:
-                    raise OrderAPIError(409, "BUYER_EDITS_EXHAUSTED", "The three allowed edits have been used.")
+                    raise OrderAPIError(
+                        409, "BUYER_EDITS_EXHAUSTED", "The three allowed edits have been used."
+                    )
                 policy.edit_count += 1
                 policy.cutoff_at = start - timedelta(hours=1)
                 policy.updated_at = now
             elif split_initial_response:
                 window = changes.get("delivery_time_window")
                 if window and "/" in window:
-                    policy.cutoff_at = datetime.fromisoformat(window.split("/", 1)[0]) - timedelta(hours=1)
+                    policy.cutoff_at = datetime.fromisoformat(window.split("/", 1)[0]) - timedelta(
+                        hours=1
+                    )
                 policy.updated_at = now
         previous_status = order.status
         decision = "REVIEW_REQUIRED" if reasons else "APPLIED"
@@ -840,7 +1031,12 @@ class BuyerConfirmationService:
         if reasons and order.status not in {OrderStatus.ASSIGNED, OrderStatus.OUT_FOR_DELIVERY}:
             order.status = OrderStatus.NEEDS_REVIEW
             order.manual_review_required = True
-        elif kind == "RESPONSE" and body.action == "AVAILABLE" and order.confidence_level != "RED" and order.status in PRE_DISPATCH:
+        elif (
+            kind == "RESPONSE"
+            and body.action == "AVAILABLE"
+            and order.confidence_level != "RED"
+            and order.status in PRE_DISPATCH
+        ):
             order.status = OrderStatus.CONFIRMED
         metadata = deepcopy(order.parsing_metadata)
         metadata["buyer_confirmation"] = {
@@ -925,9 +1121,11 @@ class BuyerConfirmationService:
                 body.time_window.start.astimezone(UTC),
                 body.time_window.end.astimezone(UTC),
             )
-            if f"{start.isoformat()}/{end.isoformat()}" != order.delivery_time_window and start < now + timedelta(
-                minutes=self.settings.buyer_min_notice_minutes
-            ) or end > now + timedelta(days=self.settings.buyer_max_schedule_days):
+            if (
+                f"{start.isoformat()}/{end.isoformat()}" != order.delivery_time_window
+                and start < now + timedelta(minutes=self.settings.buyer_min_notice_minutes)
+                or end > now + timedelta(days=self.settings.buyer_max_schedule_days)
+            ):
                 raise OrderAPIError(
                     422,
                     "INVALID_DELIVERY_WINDOW",
@@ -940,8 +1138,15 @@ class BuyerConfirmationService:
                     "Time window must fit within one Yangon calendar day.",
                 )
             changes["delivery_time_window"] = f"{start.isoformat()}/{end.isoformat()}"
-            if order.status in {OrderStatus.ASSIGNED, OrderStatus.OUT_FOR_DELIVERY} and changes["delivery_time_window"] != order.delivery_time_window:
-                raise OrderAPIError(409, "ASSIGNED_WINDOW_LOCKED", "The delivery date and window cannot change after assignment.")
+            if (
+                order.status in {OrderStatus.ASSIGNED, OrderStatus.OUT_FOR_DELIVERY}
+                and changes["delivery_time_window"] != order.delivery_time_window
+            ):
+                raise OrderAPIError(
+                    409,
+                    "ASSIGNED_WINDOW_LOCKED",
+                    "The delivery date and window cannot change after assignment.",
+                )
             if not self.settings.buyer_rescheduling_enabled:
                 reasons.append("COURIER_RESCHEDULING_REVIEW_REQUIRED")
             if now.astimezone(YANGON).hour >= self.settings.buyer_cutoff_hour:
@@ -1016,7 +1221,6 @@ class BuyerConfirmationService:
 
     def review(self, order_id, request_id, actor, body):
         from app.schemas.buyer import BuyerLocation, BuyerResponse
-
         from app.services.automatic_assignment import lock_allocator
 
         lock_allocator(self.session)
@@ -1042,7 +1246,10 @@ class BuyerConfirmationService:
                 409, "BUYER_REQUEST_ALREADY_REVIEWED", "Buyer request was already reviewed."
             )
         OrderManagementService.check_version(order, body.expected_version)
-        if (order.status not in PRE_DISPATCH and order.status not in {OrderStatus.ASSIGNED, OrderStatus.OUT_FOR_DELIVERY}) or row.decision != "REVIEW_REQUIRED":
+        if (
+            order.status not in PRE_DISPATCH
+            and order.status not in {OrderStatus.ASSIGNED, OrderStatus.OUT_FOR_DELIVERY}
+        ) or row.decision != "REVIEW_REQUIRED":
             raise OrderAPIError(
                 409,
                 "BUYER_REVIEW_NOT_ELIGIBLE",
@@ -1057,7 +1264,7 @@ class BuyerConfirmationService:
                 value = BuyerRequestSubmission.model_validate(values)
                 # Location has its own request and requires its own approval.
                 changes = {
-                    "delivery_time_window": f"{value.time_window.start.astimezone(UTC).isoformat()}/{value.time_window.end.astimezone(UTC).isoformat()}",
+                    "delivery_time_window": f"{value.time_window.start.astimezone(UTC).isoformat()}/{value.time_window.end.astimezone(UTC).isoformat()}",  # noqa: E501 — preserve literal message or SQL
                     "delivery_instructions": value.instructions,
                 }
             elif row.kind == "LOCATION":
@@ -1124,15 +1331,17 @@ class BuyerConfirmationService:
         self.session.flush()
         if assigned:
             remaining = self.session.scalar(
-                select(BuyerRequest.id).where(
+                select(BuyerRequest.id)
+                .where(
                     BuyerRequest.order_id == order.id,
                     BuyerRequest.decision == "REVIEW_REQUIRED",
                     BuyerRequest.resolution.is_(None),
-                ).limit(1)
+                )
+                .limit(1)
             )
             if remaining is None:
                 from app.db.rider_models import AutomaticAllocation, DeliveryAssignment
-                from app.services.automatic_assignment import material_hash, customer_response
+                from app.services.automatic_assignment import customer_response, material_hash
                 from app.services.riders import bump_queue
 
                 allocation = self.session.get(AutomaticAllocation, order.id)
@@ -1141,11 +1350,15 @@ class BuyerConfirmationService:
                     effective_response, issue = customer_response(self.session, order)
                     if effective_response is not None and issue is None:
                         allocation.buyer_response_id = effective_response.id
-                    allocation.reason = "Dispatcher reconfirmed reviewed buyer changes for the current rider."
-                assignment = self.session.scalar(select(DeliveryAssignment).where(
-                    DeliveryAssignment.order_id == order.id,
-                    DeliveryAssignment.status == "ACTIVE",
-                ))
+                    allocation.reason = (
+                        "Dispatcher reconfirmed reviewed buyer changes for the current rider."
+                    )
+                assignment = self.session.scalar(
+                    select(DeliveryAssignment).where(
+                        DeliveryAssignment.order_id == order.id,
+                        DeliveryAssignment.status == "ACTIVE",
+                    )
+                )
                 if assignment is not None:
                     bump_queue(self.session, assignment.rider_id)
         result = {

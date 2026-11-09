@@ -411,9 +411,13 @@ def test_frontend_allowlist_and_production_gate(workspace):
             assert client.get(path).status_code == 404
     core = create_app(
         Settings(
-            _env_file=None, environment="production", order_management_enabled=True,
-            buyer_otp_mode="twilio", buyer_otp_external_sends_enabled=True,
-            buyer_twilio_account_sid="ACtest", buyer_twilio_auth_token="test-token",
+            _env_file=None,
+            environment="production",
+            order_management_enabled=True,
+            buyer_otp_mode="twilio",
+            buyer_otp_external_sends_enabled=True,
+            buyer_twilio_account_sid="ACtest",
+            buyer_twilio_auth_token="test-token",
             buyer_twilio_verify_service_sid="VAtest",
         )
     )

@@ -364,6 +364,7 @@ class Experiment:
             action["failure_reason"] = "CUSTOMER_UNAVAILABLE"
         else:
             action["cod_collected"] = True
+            action["actual_amount"] = int(Decimal(row["cod_amount"] or "0"))
         if self.config.demo and index == 0 and Decimal(row["cod_amount"] or "0") > 0:
             self.call(
                 rider_client,
@@ -434,7 +435,7 @@ class Experiment:
                     capture=index < 5,
                 )
                 created = self.call(
-                    self.client(merchants[planned.merchant]),
+                    self.dispatcher,
                     "POST",
                     "/api/orders",
                     "order_create",

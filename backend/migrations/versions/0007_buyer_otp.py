@@ -13,7 +13,12 @@ def upgrade():
     op.create_table(
         "buyer_otp_challenges",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("link_id", sa.Uuid(), sa.ForeignKey("confirmation_links.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column(
+            "link_id",
+            sa.Uuid(),
+            sa.ForeignKey("confirmation_links.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
         sa.Column("phone_binding", sa.String(64), nullable=False),
         sa.Column("generation", sa.Integer(), nullable=False),
         sa.Column("code_digest", sa.String(64), nullable=False),
@@ -30,7 +35,9 @@ def upgrade():
         sa.CheckConstraint("generation >= 0", name="ck_buyer_otp_generation"),
     )
     op.create_index("ix_buyer_otp_link_status", "buyer_otp_challenges", ["link_id", "status"])
-    op.create_index("ix_buyer_otp_phone_status", "buyer_otp_challenges", ["phone_binding", "status"])
+    op.create_index(
+        "ix_buyer_otp_phone_status", "buyer_otp_challenges", ["phone_binding", "status"]
+    )
 
 
 def downgrade():

@@ -313,9 +313,7 @@ def run_hosted_verification(url: str | None = None, auto_migrate: bool = True) -
                 return 1
             except StaleDataError:
                 sess2.rollback()
-                print(
-                    "[PASS] Optimistic locking correctly rejected stale version update."
-                )
+                print("[PASS] Optimistic locking correctly rejected stale version update.")
         finally:
             sess1.close()
             sess2.close()

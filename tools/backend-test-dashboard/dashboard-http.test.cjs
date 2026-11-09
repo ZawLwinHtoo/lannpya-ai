@@ -121,13 +121,16 @@ test('actual dashboard controls process delivery and failure scenarios over isol
     });
 
     await t.test('automatic offer, acceptance, departure, COD completion and duplicate protection',async()=>{
+      // The rescheduling example above is intentionally for tomorrow. Deliver a separate parcel scheduled today.
+      identifier=(await click('create-order',201)).id;
+      await status('NEEDS_REVIEW');await verifyBuyerAndConfirm();
       const prepared=await reconfirm(identifier);assert.equal(prepared.order.status,'ASSIGNED');
       assert.equal(prepared.assignment.response_status,'PENDING');rider=prepared.assignment.rider_id;
       await riderAction(rider,identifier,{expected_version:prepared.order.version,request_id:crypto.randomUUID(),action:'ACCEPT',assignment_id:prepared.assignment.id,offer_version:prepared.assignment.offer_version});
-      await dispatch(prepared.route);await click('list-riders');n('active-rider').value=rider;await n('active-rider').trigger('change');
-      const queue=await click('queue');assert.equal(queue.items.length,1);assert.equal(queue.items[0].order_id,identifier);assert.equal(queue.items[0].delivery_instructions,'Fictional buyer: ring twice');assert.equal(queue.items[0].coordinate_status,'BUYER_CONFIRMED');assert.equal(queue.items[0].confidence_level,'AMBER');assert.ok(queue.items[0].confirmed_window_start);
-      n('cod-collected').checked=false;await click('deliver',409);
-      n('cod-collected').checked=true;assert.equal((await click('deliver')).status,'DELIVERED');
+      await click('list-riders');n('active-rider').value=rider;await n('active-rider').trigger('change');
+      const queue=await click('queue');assert.equal(queue.items.length,1);assert.equal(queue.items[0].order_id,identifier);assert.equal(queue.items[0].delivery_instructions,'Fictional buyer: ring twice');assert.equal(queue.items[0].coordinate_status,'BUYER_CONFIRMED');assert.equal(queue.items[0].confidence_level,'AMBER');assert.equal(queue.items[0].confirmed_window_start,null);
+      n('cod-collected').checked=false;n('actual-amount').value='25000';await click('deliver',409);
+      n('cod-collected').checked=true;n('actual-amount').value='25000';assert.equal((await click('deliver')).status,'DELIVERED');
       await click('deliver',404);
       const events=await click('events');assert.equal(events.items.filter(e=>e.event_type==='DELIVERY_COMPLETED').length,1);
       assert.equal((await click('load-order')).status,'DELIVERED');
@@ -143,12 +146,13 @@ test('actual dashboard controls process delivery and failure scenarios over isol
       const wrongRider=profiles.items.find(profile=>profile.id!==prepared.assignment.rider_id);assert.ok(wrongRider);
       await riderAction(wrongRider.id,failedId,{expected_version:prepared.order.version,request_id:crypto.randomUUID(),action:'START'},404);
       rider=prepared.assignment.rider_id;await riderAction(rider,failedId,{expected_version:prepared.order.version,request_id:crypto.randomUUID(),action:'ACCEPT',assignment_id:prepared.assignment.id,offer_version:prepared.assignment.offer_version});
-      await dispatch(prepared.route);await click('list-riders');n('active-rider').value=rider;await n('active-rider').trigger('change');
+      await click('list-riders');n('active-rider').value=rider;await n('active-rider').trigger('change');
       const failedQueue=await click('queue');assert.ok(failedQueue.items.some(item=>item.order_id===failedId));
       n('failure-reason').value='CUSTOMER_UNAVAILABLE';assert.equal((await click('fail-delivery')).status,'FAILED');
     });
 
     await t.test('authorization expiry, link expiry, real three-failure lockout and activity privacy',async()=>{
+      n('reset-text').value='RESET FICTIONAL DATA';await n('reset').trigger('click');
       await click('create-order',201);await status('NEEDS_REVIEW');await click('generate-link',201);
       await click('verify');await click('expire-session');await click('buyer-details',401);
       await click('expire-link');await click('buyer-card',410);

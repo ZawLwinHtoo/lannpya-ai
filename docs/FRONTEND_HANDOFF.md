@@ -389,3 +389,13 @@ These use the existing private local BFF and role-bound access. Google estimates
 default-disabled, require explicit consent and a durable server budget, and do not alter
 simulated optimization or assignments. Riders can estimate only their active assigned
 deliveries. See [Google dispatcher integration](mapping-routing/GOOGLE_DISPATCHER_INTEGRATION.md).
+
+## Additional implemented operations
+
+- `POST /api/confirm/lookup`
+- `GET /api/confirm/{token}/tracking`
+- `PATCH /api/confirm/{token}/request`
+- `GET /api/riders/{rider_id}/deliveries/{order_id}/tracking`
+- `POST /api/riders/{rider_id}/deliveries/{order_id}/tracking`
+
+See OPENAPI.json for request and response schemas.

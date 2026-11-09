@@ -34,13 +34,13 @@ router = APIRouter(
 RiderActor = Annotated[User, Depends(get_rider_actor)]
 
 
-@router.get("/riders/{rider_id:uuid}/deliveries/{order_id:uuid}/tracking")
+@router.get("/riders/{rider_id:uuid}/deliveries/{order_id:uuid}/tracking", response_model=dict)
 def tracking(rider_id: UUID, order_id: UUID, session: SessionDep, actor: RiderActor):
     order = delivery_tracking.rider_order(session, actor, rider_id, order_id)
     return delivery_tracking.snapshot(session, order)
 
 
-@router.post("/riders/{rider_id:uuid}/deliveries/{order_id:uuid}/tracking")
+@router.post("/riders/{rider_id:uuid}/deliveries/{order_id:uuid}/tracking", response_model=dict)
 def share_position(
     rider_id: UUID,
     order_id: UUID,

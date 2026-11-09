@@ -53,7 +53,8 @@ def route_row(session, identifier, actor, lock=False):
         raise OrderAPIError(403, "ROLE_FORBIDDEN", "Route access is unavailable.")
     session.refresh(row)
     if (
-        lock and actor.role in {UserRole.ADMIN, UserRole.DISPATCHER}
+        lock
+        and actor.role in {UserRole.ADMIN, UserRole.DISPATCHER}
         and not row.data.get("hub_account_id")
     ):
         row.data = {**row.data, "hub_account_id": str(actor.id)}
@@ -71,12 +72,11 @@ def scoped_routes(session, actor):
     legacy = session.scalars(query.where(owner.is_(None))).all()
     legacy_ids = []
     if legacy:
-        own_orders = {
-            str(i) for i in session.scalars(select(Order.id).where(order_scope(actor)))
-        }
+        own_orders = {str(i) for i in session.scalars(select(Order.id).where(order_scope(actor)))}
         legacy_ids = [
-            r.id for r in legacy if r.data.get("order_ids")
-            and all(i in own_orders for i in r.data["order_ids"])
+            r.id
+            for r in legacy
+            if r.data.get("order_ids") and all(i in own_orders for i in r.data["order_ids"])
         ]
     return query.where(or_(owner == str(actor.id), WorkflowRoute.id.in_(legacy_ids)))
 

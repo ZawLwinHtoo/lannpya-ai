@@ -4,7 +4,16 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, Uuid
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models import JSON_VALUE, Base, UTCDateTime, utcnow
@@ -129,9 +138,7 @@ class BuyerEditPolicy(Base):
     """Durable order-scoped buyer edit allowance and permanent deadline."""
 
     __tablename__ = "buyer_edit_policies"
-    __table_args__ = (
-        CheckConstraint("edit_count BETWEEN 0 AND 3", name="ck_buyer_edit_count"),
-    )
+    __table_args__ = (CheckConstraint("edit_count BETWEEN 0 AND 3", name="ck_buyer_edit_count"),)
     order_id: Mapped[UUID] = mapped_column(
         ForeignKey("orders.id", ondelete="RESTRICT"), primary_key=True
     )
@@ -147,7 +154,9 @@ class BuyerSubmissionReceipt(Base):
     __table_args__ = (
         UniqueConstraint("order_id", "request_id", name="ux_buyer_receipt_order_request"),
     )
-    order_id: Mapped[UUID] = mapped_column(ForeignKey("orders.id", ondelete="RESTRICT"), primary_key=True)
+    order_id: Mapped[UUID] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), primary_key=True
+    )
     request_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     link_id: Mapped[UUID] = mapped_column(ForeignKey("confirmation_links.id", ondelete="RESTRICT"))
     payload_hash: Mapped[str] = mapped_column(String(64))
@@ -158,9 +167,14 @@ class BuyerSubmissionReceipt(Base):
 class BuyerReminderOutbox(Base):
     __tablename__ = "buyer_reminder_outbox"
     __table_args__ = (
-        CheckConstraint("status IN ('PENDING','SENDING','ACCEPTED','UNKNOWN','SIMULATION','SKIPPED','DISABLED')", name="ck_buyer_reminder_status"),
+        CheckConstraint(
+            "status IN ('PENDING','SENDING','ACCEPTED','UNKNOWN','SIMULATION','SKIPPED','DISABLED')",  # noqa: E501 — preserve literal message or SQL
+            name="ck_buyer_reminder_status",
+        ),
     )
-    order_id: Mapped[UUID] = mapped_column(ForeignKey("orders.id", ondelete="RESTRICT"), primary_key=True)
+    order_id: Mapped[UUID] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), primary_key=True
+    )
     scheduled_at: Mapped[datetime] = mapped_column(UTCDateTime())
     cutoff_at: Mapped[datetime] = mapped_column(UTCDateTime())
     status: Mapped[str] = mapped_column(String(16), default="PENDING")

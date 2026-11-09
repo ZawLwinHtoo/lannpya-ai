@@ -67,17 +67,21 @@ async function history() {
 }
 async function delivery(action) {
   const row=await refreshOrder(), rider=currentRider();const body={expected_version:row.version,request_id:crypto.randomUUID(),action};
-  if(action==='DELIVERED')body.cod_collected=$('cod-collected').checked;
+  if(action==='DELIVERED'){
+    body.cod_collected=$('cod-collected').checked;
+    if($('actual-amount').value.trim())body.actual_amount=Number($('actual-amount').value);
+  }
   if(action==='FAILED')body.failure_reason=$('failure-reason').value;
   await api('PATCH',`/api/riders/${rider.id}/deliveries/${row.id}/status`,body,{actor:'rider',rider_id:rider.id});await refreshOrder();state.cursor=null;await queue(true);
 }
 async function guard(fn) {if(state.busy)return;state.busy=true;try{await fn();}catch(error){if(!error.displayed)result({error:{message:error.message}},'Operation failed · no simulated fallback',true);}finally{state.busy=false;}}
+$('delivery-day').value=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Yangon',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const on=(id,fn)=>$(id).addEventListener('click',()=>guard(fn));
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
 $('example').addEventListener('change',()=>$('raw-text').value=examples[$('example').value]);$('raw-text').value=examples.unicode;
 on('health',async()=>{await api('GET','/health');$('connection').textContent='Backend connected · isolated SQLite';});
 on('parse',async()=>api('POST','/api/orders/parse',{raw_text:$('raw-text').value}));
-on('create-order',async()=>{const row=await api('POST','/api/orders',{merchant_id:state.boot.merchant_id,raw_text:$('raw-text').value});selectOrder(row);await listOrders();tab('orders');});
+on('create-order',async()=>{const row=await api('POST','/api/orders',{merchant_id:state.boot.merchant_id,raw_text:$('raw-text').value,parcel:{item:'Synthetic test parcel',delivery_day:$('delivery-day').value}});selectOrder(row);await listOrders();tab('orders');});
 on('load-order',async()=>{const row=await refreshOrder();result(row,'Saved order loaded');});
 on('list-orders',async()=>{state.page=1;await listOrders();});on('prev-page',async()=>{if(state.page>1){state.page--;await listOrders();}});on('next-page',async()=>{if(state.page*10<state.total){state.page++;await listOrders();}});
 on('correct',async()=>{const fields=JSON.parse($('correction').value);const row=await refreshOrder();selectOrder(await api('PATCH',`/api/orders/${row.id}`,{...fields,expected_version:row.version}));await listOrders();});

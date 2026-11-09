@@ -169,11 +169,15 @@ class Sandbox:
         link_id = None
         if buyer is not None and buyer["owner"] == owner:
             link_id = UUID(buyer["link_id"])
-        elif (owner, handle) in self.workspace_buyers and re.fullmatch(r"[A-Za-z0-9_-]{43}", handle):
+        elif (owner, handle) in self.workspace_buyers and re.fullmatch(
+            r"[A-Za-z0-9_-]{43}", handle
+        ):
             with self.database.sessions() as session:
-                link = session.scalar(select(ConfirmationLink).where(
-                    ConfirmationLink.token_hash == hashlib.sha256(handle.encode()).hexdigest()
-                ))
+                link = session.scalar(
+                    select(ConfirmationLink).where(
+                        ConfirmationLink.token_hash == hashlib.sha256(handle.encode()).hexdigest()
+                    )
+                )
                 link_id = link.id if link else None
         if link_id is None:
             return None
@@ -188,7 +192,8 @@ class Sandbox:
                 or link.revoked_at is not None
                 or link.locked_at is not None
                 or link.expires_at <= now
-                or order.status not in {
+                or order.status
+                not in {
                     OrderStatus.DRAFT,
                     OrderStatus.NEEDS_REVIEW,
                     OrderStatus.AWAITING_CONFIRMATION,
@@ -213,7 +218,11 @@ class Sandbox:
             )
             if challenge is None:
                 return None
-            return {"simulation": True, "code": challenge.demo_code, "expires_at": challenge.expires_at}
+            return {
+                "simulation": True,
+                "code": challenge.demo_code,
+                "expires_at": challenge.expires_at,
+            }
 
     def reset(self):
         with self.lock:

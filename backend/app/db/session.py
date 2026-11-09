@@ -61,4 +61,3 @@ class Database:
 
     def dispose(self):
         self.engine.dispose()
-

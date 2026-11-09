@@ -1,4 +1,4 @@
-const {test,expect,create,link,verify,approve,assignDispatch,inspect,shot}=require('./fixtures.cjs');
+const {test,expect,create,link,verify,approve,assignDispatch,inspect,shot,enter}=require('./fixtures.cjs');
 
 test('Leaflet click and real marker drag submit a reviewed pin that reaches the rider queue',async({page})=>{
   const id=await create(page),url=await link(page),buyer=await page.context().newPage();await verify(buyer,url);
@@ -21,10 +21,10 @@ test('Leaflet click and real marker drag submit a reviewed pin that reaches the 
   expect(Number(saved.latitude)).toBe(lat);expect(Number(saved.longitude)).toBe(lng);expect(saved.confidence_level).toBe('AMBER');
   await expect(page.locator('#delivery-history')).toContainText('BUYER LOCATION');
   await expect(page.locator('#delivery-history')).toContainText('BUYER REQUEST REVIEWED');
-  await assignDispatch(page);await page.locator('.role-switch a[href="#/rider"]').click();
-  await page.locator('#connect-form button[type=submit]').click();
-  const nav=page.getByRole('link',{name:/Open Google Maps/});await expect(nav).toBeVisible();
-  expect(new URL(await nav.getAttribute('href')).searchParams.get('destination').split(',').map(Number)).toEqual([lat,lng]);
+  const activeRider=await assignDispatch(page);await enter(page,'rider',activeRider);
+  const nav=page.getByRole('link',{name:/Google Maps/}).first();await expect(nav).toBeVisible();
+  const parameters=new URL(await nav.getAttribute('href')).searchParams;
+  expect((parameters.get('destination')||parameters.get('query')).split(',').map(Number)).toEqual([lat,lng]);
   await shot(buyer,'phase16-customer-selected-pin');
 });
 
@@ -50,11 +50,11 @@ test('street tiles load automatically and are mocked at the browser boundary wit
 });
 
 test('history displays real chronological completion events without private metadata',async({page})=>{
-  const id=await create(page,{pin:true});await assignDispatch(page);
-  await page.locator('.role-switch a[href="#/rider"]').click();await page.locator('#connect-form button[type=submit]').click();
+  const id=await create(page,{pin:true});const activeRider=await assignDispatch(page);
+  await enter(page,'rider',activeRider);
   await page.locator('[data-action=deliver]').click();await expect(page.locator('dialog button[type=submit]')).toBeEnabled();
   await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
-  await page.locator('.role-switch a[href="#/admin"]').click();await page.locator(`a[href="#/order/${id}"]`).first().click();
+  await enter(page,'admin');await page.locator(`a[href="#/order/${id}"]`).first().click();
   const history=page.locator('#delivery-history');await expect(history).toContainText('DELIVERY COMPLETED');
   await expect(history).toContainText('DELIVERY STARTED');await expect(history).toContainText(/ASSIGN/);
   const times=await history.locator('time').evaluateAll(xs=>xs.map(x=>x.dateTime));expect(times).toEqual([...times].sort());
