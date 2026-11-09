@@ -7,7 +7,7 @@ async function order(page,name,coordinates=true){
   for(const [k,v]of Object.entries({name,phone:'09790000000',item:'Fictional routing parcel',street:'Synthetic test street',landmark:'စမ်းသပ် ဂိတ်',expected:'25000'}))await f.locator(`[name=${k}]`).fill(v);
   await f.locator('[name=areaId]').selectOption('Hlaing');await f.locator('[name=received]').check();
   if(coordinates){await f.getByText('Known map coordinates (optional)',{exact:true}).click();await f.locator('[name=lat]').fill('16.81');await f.locator('[name=lng]').fill('96.11');await f.locator('[name=locationReviewed]').check();}
-  await f.locator('button').last().click();await expect(page.locator('#edit-form')).toBeVisible();
+  await f.locator('button').last().click();await page.locator('[data-created=open]').click();await expect(page.locator('#edit-form')).toBeVisible();
   const id=new URL(page.url()).hash.split('/').at(-1);
   if(coordinates){
     await page.locator('[data-action=issue]').click();const link=page.getByRole('link',{name:'See what the buyer sees'});await expect(link).toBeVisible();const href=await link.getAttribute('href');

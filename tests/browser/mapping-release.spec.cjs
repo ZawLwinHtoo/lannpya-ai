@@ -15,7 +15,7 @@ for(const [width,height] of [[1440,900],[1366,768],[768,1024],[390,844],[360,740
       await page.goto('/#/manual');const form=page.locator('#manual-form');await expect(form).toBeVisible();
       for(const [k,v]of Object.entries({name:'Fictional Mapping Release Buyer',phone:'09790000000',item:'Synthetic shirt',street:'စမ်းသပ်လမ်း',landmark:'Fictional test gate',expected:'25000'}))await form.locator(`[name=${k}]`).fill(v);
       await form.locator('[name=areaId]').selectOption('Hlaing');await form.locator('[name=received]').check();await form.locator('button').last().click();
-      await expect(page.locator('#edit-form')).toBeVisible();const id=new URL(page.url()).hash.split('/').at(-1);
+      await page.locator('[data-created=open]').click();await expect(page.locator('#edit-form')).toBeVisible();const id=new URL(page.url()).hash.split('/').at(-1);
       await page.locator('[data-action=issue]').click();const link=page.getByRole('link',{name:'See what the buyer sees'});await expect(link).toBeVisible();
       await verify(page,new URL(await link.getAttribute('href'),page.url()).href);
       const map=page.locator('#buyer-map');await expect(map).toBeVisible();await expect(page.locator('[name=latitude]')).toHaveValue('');

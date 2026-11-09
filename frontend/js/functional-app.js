@@ -563,6 +563,11 @@
 
       $('.check-head').insertAdjacentHTML('afterend',`<p class="live-notice">Backend confidence: ${esc(o.confidence)} · AI: ${esc(o.ai)}. A stored or approved pin is not independent geospatial verification.</p>${o.pin?`<div class="live-map" data-view-map data-lat="${o.pin.lat}" data-lng="${o.pin.lng}" aria-label="Stored delivery point"></div>`:''}`);
     }
+    if(!customer&&!rider&&path==='routes'){
+      const container=document.createElement('section');container.className='panel functional-card routing-panel';
+      $('.content').append(container);
+      window.LannPyaRouting.mount({container,store,afterCommit:render}).catch(err=>{if(container.isConnected)container.textContent='Route planning unavailable: '+err.message;});
+    }
     if(rider){
       mountRiderRouteMap();
       const refresh=$('.rider-demo [data-action=refresh-queue]');if(refresh){refresh.remove();$('.rider-head')?.insertAdjacentHTML('afterend',btn('Refresh approved stops','refresh-queue','','quiet sm'));}
