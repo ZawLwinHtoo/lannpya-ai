@@ -9,11 +9,12 @@ const {pythonPath,root}=require('../../scripts/python_path.cjs');
 const shots=process.env.LANNPYA_SCREENSHOT_DIR||path.join(root,'docs/visual-testing/screenshots');
 const sanitize=s=>String(s).replace(/[A-Za-z0-9_-]{43,}/g,'[redacted]').replace(/\/confirm\/[^/?\s]+/g,'/confirm/[redacted]');
 const test=base.extend({
-  app:async({},use,testInfo)=>{
+  businessClock:[false,{option:true}],
+  app:async({businessClock},use,testInfo)=>{
     const probe=net.createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');
     const port=probe.address().port;await new Promise(r=>probe.close(r));
     const origin=`http://127.0.0.1:${port}`;
-    const child=spawn(pythonPath(),['-m','tools.integrated_workspace','--port',String(port),'--temporary'],{
+    const child=spawn(pythonPath(),[...(businessClock?[path.join(root,'tests/browser/business_clock_server.py')]:['-m','tools.integrated_workspace']),'--port',String(port),'--temporary'],{
       cwd:path.join(root,'backend'),stdio:['ignore','ignore','pipe'],windowsHide:true,
       env:{...process.env,LANNPYA_ENVIRONMENT:'test',LANNPYA_ROUTING_PROVIDER:'offline',LANNPYA_ROUTING_EXTERNAL_REQUESTS_ENABLED:'false',LANNPYA_GOOGLE_DEMO_ENABLED:'false',LANNPYA_GOOGLE_DEMO_MAX_REQUESTS:'0',LANNPYA_GOOGLE_MAPS_BROWSER_KEY:''},
     });
@@ -37,7 +38,7 @@ const test=base.extend({
       if(stderr.includes('Traceback'))await testInfo.attach('server-errors',{body:sanitize(stderr),contentType:'text/plain'});
     }
   },
-  page:async({browser,app,hasTouch},use,testInfo)=>{
+  page:async({browser,app,hasTouch,businessClock},use,testInfo)=>{
     const context=await browser.newContext({baseURL:app.origin,viewport:testInfo.project.use.viewport||{width:1440,height:900},timezoneId:'Asia/Rangoon',hasTouch});
     const activity=[],errors=[],network=[],starts=new WeakMap();
     context.on('page',p=>{
@@ -51,7 +52,10 @@ const test=base.extend({
       });
       p.on('request',r=>{starts.set(r,Date.now());if(r.headers()['x-dev-access-token']||r.headers().authorization)errors.push('Privileged credential reached browser request');});
     });
+    // Tile pixels are synthetic; these checks verify controls/geometry without remote basemap traffic.
+    await context.route(/https:\/\/(?:[abc]\.)?tile\.openstreetmap\.org\//,route=>route.fulfill({status:200,contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=','base64')}));
     const page=await context.newPage();
+    if(businessClock)await page.clock.setFixedTime(new Date(new Date(Date.now()+23400000).toISOString().slice(0,10)+'T04:30:00Z'));
     page.audit={activity,errors,expectedHttp:new Set()};
     try{
       await use(page);expect(errors,'Uncaught JavaScript errors or credential leak').toEqual([]);
@@ -101,13 +105,22 @@ async function link(page){
   return page.locator('[name=generated-link]').inputValue();
 }
 async function verify(page,url,digits=null){
-  await page.goto(url);await expect(page.locator('[data-action=request-buyer-otp]')).toBeVisible();
-  const handle=String(url).match(/(?:track\/|confirm\/)([A-Za-z0-9_-]{43})/)?.[1];if(!handle)throw Error('Could not find the local buyer handle in this test link.');
-  await page.locator('[data-action=request-buyer-otp]').click();await expect(page.locator('#verify-api-form')).toBeVisible();
-  if(digits===null){const r=await page.request.get('/dashboard/buyer-otp?buyer_handle='+encodeURIComponent(handle));if(!r.ok())throw Error('Protected local test code is unavailable.');digits=(await r.json()).code;}
-  await page.locator('#verify-api-form [name=digits]').fill(digits);
-  await page.locator('#verify-api-form button[type=submit]').click();
+  await page.goto(url);
+  const native=!new URL(url,page.url()).pathname.endsWith('/api.html');
+  const request=native?'[data-action=request-otp]':'[data-action=request-buyer-otp]';
+  await expect(page.locator(request)).toBeVisible();
+  const handle=String(url).match(/(?:track\/|confirm\/)([A-Za-z0-9_-]{43})/)?.[1];
+  if(!handle)throw Error('Could not find the local buyer handle in this test link.');
+  await page.locator(request).click();
+  const form=page.locator(native?'#verify-form':'#verify-api-form');await expect(form).toBeVisible();
+  if(digits===null){
+    const r=await page.request.get('/dashboard/buyer-otp?buyer_handle='+encodeURIComponent(handle));
+    if(!r.ok())throw Error('Protected local test code is unavailable.');digits=(await r.json()).code;
+  }
+  await form.locator('[name=digits]').fill(digits);
+  await form.locator('button[type=submit],button.customer-primary').click();
 }
+
 async function approve(page,id){
   await page.locator('[data-action=refresh]').first().click();await expect(page.locator('#edit-api-form')).toBeVisible();
   while(await page.locator('[data-action=review]').count()){

@@ -1,6 +1,7 @@
 const {test,expect,inspect,enter}=require('./fixtures.cjs');
 const fs=require('node:fs');
 const path=require('node:path');
+test.use({businessClock:true});
 // Map/network tests use local Leaflet. Optional remote font delivery is independent of API correctness.
 test.beforeEach(async({page})=>{await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({status:200,contentType:'text/css',body:''}));});
 async function manual(page){
@@ -16,7 +17,7 @@ async function manual(page){
   return new URL(page.url()).hash.split('/').at(-1);
 }
 async function buyerLink(page){
-  await page.locator('[data-action=issue]').click();
+  if(!await page.getByRole('link',{name:'See what the buyer sees'}).count())await page.locator('[data-action=issue]').click();
   const link=page.getByRole('link',{name:'See what the buyer sees'});await expect(link).toBeVisible();
   return link.getAttribute('href');
 }
@@ -85,7 +86,7 @@ test('MTT browser creates persistent order, buyer pin, dispatcher review, rider 
   await expect(page.locator('[name=longitude]')).not.toHaveValue(first);
   const latitude=await page.locator('[name=latitude]').inputValue();
   await page.locator('[name=initial_pin_acknowledged]').focus();await page.locator('[name=initial_pin_acknowledged]').press('Space');
-  const minute=new Date(Date.now()+23400000).getUTCHours()*60+new Date(Date.now()+23400000).getUTCMinutes();
+  const minute=await page.evaluate(()=>new Date(Date.now()+23400000).getUTCHours()*60+new Date(Date.now()+23400000).getUTCMinutes());
   const window=await page.locator('[name=time] option').evaluateAll((options,minute)=>options.map(o=>o.value).find(v=>{const m=v.match(/^(\d+):(\d+)–(\d+):(\d+)$/);return m&&+m[1]*60+(+m[2])<=minute&&minute<+m[3]*60+(+m[4]);}),minute);
   if(window)await page.locator('[name=time]').selectOption(window);
   await page.locator('[name=note]').fill('စမ်းသပ်မှတ်ချက် — call at fictional gate');

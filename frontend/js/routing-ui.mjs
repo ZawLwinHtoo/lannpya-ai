@@ -52,7 +52,7 @@ export async function mountRiderPlan({container,store}){
   if(!plan){container.innerHTML='<p>No committed optimization plan. Follow the existing dispatcher stop order and refresh for updates.</p>';return;}
   container.innerHTML=`<h2>Assigned route plan</h2>${plan.stale?'<p class="live-notice">Plan is stale after an order/queue change. Estimates need dispatcher review; follow the current queue and navigation pin.</p>':''}`+resultHTML(plan);
   maps(container,plan);
-  
+  await mountGoogleEstimate({container,store,side:'rider'});
 }
 
 export async function mountGoogleEstimate({container,store,side='admin'}){
