@@ -317,8 +317,15 @@ def create_dashboard(origin="http://127.0.0.1:8765", *, sandbox_factory=Sandbox,
         with app.state.sandbox.lock:
             value = app.state.sandbox.demo_otp(buyer_handle, request.state.owner)
             if value is None:
-                return error(404, "DEMO_CODE_UNAVAILABLE", "No active local demo code exists for this buyer link.")
-            return {**value, "notice": "SIMULATION ONLY — enter this test code in the local buyer flow."}
+                return error(
+                    404,
+                    "DEMO_CODE_UNAVAILABLE",
+                    "No active local demo code exists for this buyer link.",
+                )
+            return {
+                **value,
+                "notice": "SIMULATION ONLY — enter this test code in the local buyer flow.",
+            }
 
     @app.post("/dashboard/reset")
     def reset(body: ResetBody):
@@ -416,8 +423,13 @@ def create_dashboard(origin="http://127.0.0.1:8765", *, sandbox_factory=Sandbox,
                 )
             if body.actor == "rider":
                 permitted = body.rider_id and (
-                    (body.method in {"GET", "POST"} and re.fullmatch(rf"/api/riders/{body.rider_id}/deliveries/{UUID_PATTERN}/tracking", path)) or
                     (
+                        body.method in {"GET", "POST"}
+                        and re.fullmatch(
+                            rf"/api/riders/{body.rider_id}/deliveries/{UUID_PATTERN}/tracking", path
+                        )
+                    )
+                    or (
                         body.method == "GET"
                         and path
                         in {

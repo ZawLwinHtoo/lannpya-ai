@@ -43,15 +43,23 @@ def normalize_phone(value):
             return phonenumbers.format_number(number, PhoneNumberFormat.E164)
     except phonenumbers.NumberParseException:
         pass
-    raise OrderAPIError(409, "BUYER_PHONE_UNAVAILABLE", "A valid Myanmar mobile number is required.")
+    raise OrderAPIError(
+        409, "BUYER_PHONE_UNAVAILABLE", "A valid Myanmar mobile number is required."
+    )
 
 
 def _twilio(settings, operation, *, sid=None, data=None):
     account = settings.buyer_twilio_account_sid
     service = settings.buyer_twilio_verify_service_sid
-    token = settings.buyer_twilio_auth_token.get_secret_value() if settings.buyer_twilio_auth_token else ""
+    token = (
+        settings.buyer_twilio_auth_token.get_secret_value()
+        if settings.buyer_twilio_auth_token
+        else ""
+    )
     if not (account and service and token and settings.buyer_otp_external_sends_enabled):
-        raise OrderAPIError(503, "BUYER_OTP_UNAVAILABLE", "Phone verification is temporarily unavailable.")
+        raise OrderAPIError(
+            503, "BUYER_OTP_UNAVAILABLE", "Phone verification is temporarily unavailable."
+        )
     path = f"/Services/{quote(service, safe='')}/Verifications"
     if operation == "check":
         path = f"/Services/{quote(service, safe='')}/VerificationCheck"
@@ -79,7 +87,9 @@ def _twilio(settings, operation, *, sid=None, data=None):
             raise ValueError("provider rejected request")
         return response.json()
     except Exception as exc:
-        raise OrderAPIError(503, "BUYER_OTP_UNAVAILABLE", "Phone verification is temporarily unavailable.") from exc
+        raise OrderAPIError(
+            503, "BUYER_OTP_UNAVAILABLE", "Phone verification is temporarily unavailable."
+        ) from exc
 
 
 class BuyerOtpService:
@@ -88,7 +98,9 @@ class BuyerOtpService:
 
     def _link(self, token):
         if not re.fullmatch(r"[A-Za-z0-9_-]{43}", token):
-            raise OrderAPIError(404, "CONFIRMATION_UNAVAILABLE", "Confirmation link is unavailable.")
+            raise OrderAPIError(
+                404, "CONFIRMATION_UNAVAILABLE", "Confirmation link is unavailable."
+            )
         token_hash = digest(token)
         order_id = self.session.scalar(
             select(ConfirmationLink.order_id).where(ConfirmationLink.token_hash == token_hash)
@@ -98,34 +110,61 @@ class BuyerOtpService:
 
             lock_allocator(self.session)
             lock_order(self.session, order_id)
-        link = self.session.scalar(select(ConfirmationLink).where(ConfirmationLink.token_hash == token_hash))
+        link = self.session.scalar(
+            select(ConfirmationLink).where(ConfirmationLink.token_hash == token_hash)
+        )
         if link is None:
-            raise OrderAPIError(404, "CONFIRMATION_UNAVAILABLE", "Confirmation link is unavailable.")
+            raise OrderAPIError(
+                404, "CONFIRMATION_UNAVAILABLE", "Confirmation link is unavailable."
+            )
         order = self.session.get(Order, link.order_id)
-        if (link.revoked_at or order.status == OrderStatus.CANCELLED or
-            not hmac.compare_digest(link.phone_binding, hmac.new(link.token_hash.encode(), (order.customer_phone or "").encode(), hashlib.sha256).hexdigest())):
-            raise OrderAPIError(404, "CONFIRMATION_UNAVAILABLE", "Confirmation link is unavailable.")
-        expiry = link.delivered_view_until if order.status == OrderStatus.DELIVERED else link.expires_at
+        if (
+            link.revoked_at
+            or order.status == OrderStatus.CANCELLED
+            or not hmac.compare_digest(
+                link.phone_binding,
+                hmac.new(
+                    link.token_hash.encode(), (order.customer_phone or "").encode(), hashlib.sha256
+                ).hexdigest(),
+            )
+        ):
+            raise OrderAPIError(
+                404, "CONFIRMATION_UNAVAILABLE", "Confirmation link is unavailable."
+            )
+        expiry = (
+            link.delivered_view_until if order.status == OrderStatus.DELIVERED else link.expires_at
+        )
         if expiry is None or expiry <= utcnow():
             raise OrderAPIError(410, "CONFIRMATION_EXPIRED", "Confirmation link has expired.")
         if link.locked_at or link.failed_attempts >= 3:
-            raise OrderAPIError(423, "CONFIRMATION_LOCKED", "Confirmation is locked; contact the shop.")
+            raise OrderAPIError(
+                423, "CONFIRMATION_LOCKED", "Confirmation is locked; contact the shop."
+            )
         if order.status not in {
             OrderStatus.DRAFT,
-            OrderStatus.NEEDS_REVIEW, OrderStatus.AWAITING_CONFIRMATION, OrderStatus.CONFIRMED,
-            OrderStatus.READY_FOR_DISPATCH, OrderStatus.ASSIGNED, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED,
+            OrderStatus.NEEDS_REVIEW,
+            OrderStatus.AWAITING_CONFIRMATION,
+            OrderStatus.CONFIRMED,
+            OrderStatus.READY_FOR_DISPATCH,
+            OrderStatus.ASSIGNED,
+            OrderStatus.OUT_FOR_DELIVERY,
+            OrderStatus.DELIVERED,
         }:
-            raise OrderAPIError(409, "BUYER_CHANGES_CLOSED", "Delivery details cannot be changed at this stage.")
+            raise OrderAPIError(
+                409, "BUYER_CHANGES_CLOSED", "Delivery details cannot be changed at this stage."
+            )
         return link, order
 
     def _event(self, order, link, action):
-        self.session.add(DeliveryEvent(
-            order_id=order.id,
-            event_type="BUYER_SECURITY",
-            previous_status=order.status,
-            new_status=order.status,
-            event_metadata={"link_id": str(link.id), "action": action},
-        ))
+        self.session.add(
+            DeliveryEvent(
+                order_id=order.id,
+                event_type="BUYER_SECURITY",
+                previous_status=order.status,
+                new_status=order.status,
+                event_metadata={"link_id": str(link.id), "action": action},
+            )
+        )
 
     def start(self, token):
         # Allocation and OTP start share this coordinator; always acquire it
@@ -137,10 +176,16 @@ class BuyerOtpService:
         # Local expiry, revocation, and lockout do not necessarily expire a
         # Twilio verification. Keep its SID in the replacement set so Twilio
         # cannot reuse the old code for a different link.
-        active = self.session.scalars(select(BuyerOtpChallenge).where(
-            BuyerOtpChallenge.phone_binding == phone_binding,
-            BuyerOtpChallenge.status.in_({"PENDING", "CANCEL_FAILED", "EXPIRED", "REVOKED", "LOCKED"}),
-        ).with_for_update()).all()
+        active = self.session.scalars(
+            select(BuyerOtpChallenge)
+            .where(
+                BuyerOtpChallenge.phone_binding == phone_binding,
+                BuyerOtpChallenge.status.in_(
+                    {"PENDING", "CANCEL_FAILED", "EXPIRED", "REVOKED", "LOCKED"}
+                ),
+            )
+            .with_for_update()
+        ).all()
         latest = self.session.scalar(
             select(BuyerOtpChallenge)
             .where(BuyerOtpChallenge.phone_binding == phone_binding)
@@ -152,7 +197,9 @@ class BuyerOtpService:
             and latest.status in {"PENDING", "CANCEL_FAILED", "REPLACEMENT_FAILED"}
             and latest.resend_after > now
         ):
-            raise OrderAPIError(429, "BUYER_OTP_COOLDOWN", "Please wait before requesting another code.")
+            raise OrderAPIError(
+                429, "BUYER_OTP_COOLDOWN", "Please wait before requesting another code."
+            )
         # Record cooldown before provider I/O so retries after a timeout cannot churn sends.
         for challenge in active:
             challenge.resend_after = now + timedelta(seconds=60)
@@ -181,7 +228,9 @@ class BuyerOtpService:
                 raise
             provider, sid, demo_code = "TWILIO", result.get("sid"), None
             if not sid:
-                raise OrderAPIError(503, "BUYER_OTP_UNAVAILABLE", "Phone verification is temporarily unavailable.")
+                raise OrderAPIError(
+                    503, "BUYER_OTP_UNAVAILABLE", "Phone verification is temporarily unavailable."
+                )
         challenge = BuyerOtpChallenge(
             link_id=link.id,
             phone_binding=phone_binding,
@@ -209,28 +258,45 @@ class BuyerOtpService:
         link, order = self._link(token)
         phone = normalize_phone(order.customer_phone)
         phone_binding = hashlib.sha256(phone.encode()).hexdigest()
-        challenge = self.session.scalar(select(BuyerOtpChallenge).where(
-            BuyerOtpChallenge.link_id == link.id,
-            BuyerOtpChallenge.phone_binding == phone_binding,
-            BuyerOtpChallenge.status == "PENDING",
-        ).order_by(BuyerOtpChallenge.created_at.desc()).with_for_update())
+        challenge = self.session.scalar(
+            select(BuyerOtpChallenge)
+            .where(
+                BuyerOtpChallenge.link_id == link.id,
+                BuyerOtpChallenge.phone_binding == phone_binding,
+                BuyerOtpChallenge.status == "PENDING",
+            )
+            .order_by(BuyerOtpChallenge.created_at.desc())
+            .with_for_update()
+        )
         now = utcnow()
         if challenge is None:
-            raise OrderAPIError(403, "BUYER_VERIFICATION_FAILED", "Verification failed; contact the shop if needed.")
+            raise OrderAPIError(
+                403, "BUYER_VERIFICATION_FAILED", "Verification failed; contact the shop if needed."
+            )
         if challenge.generation != link.generation:
             challenge.status, challenge.demo_code = "REVOKED", None
             self.session.commit()
-            raise OrderAPIError(403, "BUYER_VERIFICATION_FAILED", "Verification failed; contact the shop if needed.")
+            raise OrderAPIError(
+                403, "BUYER_VERIFICATION_FAILED", "Verification failed; contact the shop if needed."
+            )
         if challenge.expires_at <= now:
             if challenge:
                 challenge.status, challenge.demo_code = "EXPIRED", None
                 self.session.commit()
-            raise OrderAPIError(403, "BUYER_VERIFICATION_FAILED", "Verification failed; contact the shop if needed.")
+            raise OrderAPIError(
+                403, "BUYER_VERIFICATION_FAILED", "Verification failed; contact the shop if needed."
+            )
         valid = False
         if challenge.provider == "DEMO":
-            valid = bool(re.fullmatch(r"[0-9]{6}", code or "")) and hmac.compare_digest(challenge.code_digest, digest(code))
+            valid = bool(re.fullmatch(r"[0-9]{6}", code or "")) and hmac.compare_digest(
+                challenge.code_digest, digest(code)
+            )
         elif challenge.verification_sid and re.fullmatch(r"[0-9]{6}", code or ""):
-            response = _twilio(self.settings, "check", data={"VerificationSid": challenge.verification_sid, "Code": code})
+            response = _twilio(
+                self.settings,
+                "check",
+                data={"VerificationSid": challenge.verification_sid, "Code": code},
+            )
             valid = response.get("status") == "approved"
         if not valid:
             challenge.attempts += 1
@@ -242,16 +308,27 @@ class BuyerOtpService:
                 link.generation += 1
             self._event(order, link, "LOCKED" if link.locked_at else "VERIFICATION_FAILED")
             self.session.commit()
-            raise OrderAPIError(403, "BUYER_VERIFICATION_FAILED", "Verification failed; contact the shop if needed.")
+            raise OrderAPIError(
+                403, "BUYER_VERIFICATION_FAILED", "Verification failed; contact the shop if needed."
+            )
         challenge.status, challenge.consumed_at, challenge.demo_code = "CONSUMED", now, None
         link.generation += 1
         link.verified_at = now
+        import secrets as secret_module
+
         from app.db.buyer_models import BuyerSession
         from app.services.buyer_confirmation import digest as token_digest
-        import secrets as secret_module
+
         credential = secret_module.token_urlsafe(32)
         expires = min(link.expires_at, now + timedelta(minutes=self.settings.buyer_session_minutes))
-        self.session.add(BuyerSession(link_id=link.id, token_hash=token_digest(credential), generation=link.generation, expires_at=expires))
+        self.session.add(
+            BuyerSession(
+                link_id=link.id,
+                token_hash=token_digest(credential),
+                generation=link.generation,
+                expires_at=expires,
+            )
+        )
         self._event(order, link, "VERIFIED")
         self.session.commit()
         return {"access_token": credential, "token_type": "Bearer", "expires_at": expires}

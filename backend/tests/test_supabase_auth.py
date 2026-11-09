@@ -159,7 +159,8 @@ def test_public_signup_role_and_rider_profile(secure, monkeypatch, requested, ex
 
     def verified(settings, token, request=None):
         request.state.auth_user = {
-            "email": f"{identifier}@example.test", "email_confirmed_at": "verified",
+            "email": f"{identifier}@example.test",
+            "email_confirmed_at": "verified",
             "user_metadata": {"role": requested},
         }
         return identifier
@@ -170,4 +171,3 @@ def test_public_signup_role_and_rider_profile(secure, monkeypatch, requested, ex
     assert result.json()["role"] == expected
     with client.app.state.database.sessions() as session:
         assert (session.get(RiderProfile, identifier) is not None) == (expected == "Rider")
-

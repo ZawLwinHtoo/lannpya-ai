@@ -33,7 +33,9 @@ def hubs(tmp_path, monkeypatch):
             session.add(User(id=ids[name], name=name, email=f"{name}@example.test", role=role))
         session.flush()
         session.add(RiderProfile(id=ids["rider"], operational_status="AVAILABLE"))
-    monkeypatch.setattr("app.core.supabase_auth.verify_user", lambda settings, token, request=None: ids[token])
+    monkeypatch.setattr(
+        "app.core.supabase_auth.verify_user", lambda settings, token, request=None: ids[token]
+    )
     settings = Settings(
         _env_file=None,
         environment="test",

@@ -43,9 +43,7 @@ def upgrade():
         )
         op.execute(
             "ALTER TABLE delivery_assignments ADD COLUMN responded_at DATETIME "
-            "CONSTRAINT ck_offer_timestamp CHECK ("
-            + timestamp_check
-            + ")"
+            "CONSTRAINT ck_offer_timestamp CHECK (" + timestamp_check + ")"
         )
     else:
         op.add_column(

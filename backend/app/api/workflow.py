@@ -39,7 +39,11 @@ class OrderOperation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=1, strict=True)
     action: Literal[
-        "RECEIVE", "RETURN_RECEIVED", "RESOLVE_DIFFERENCE", "INCIDENT", "RESOLVE_INCIDENT",
+        "RECEIVE",
+        "RETURN_RECEIVED",
+        "RESOLVE_DIFFERENCE",
+        "INCIDENT",
+        "RESOLVE_INCIDENT",
         "REMOVE_FROM_BOARD",
     ]
     reason: str | None = Field(default=None, max_length=500)

@@ -86,18 +86,18 @@ def get_bound_actor(request: Request, session: Session = Depends(get_session)) -
         if getattr(settings, "auto_provision_users", False):
             auth_user = getattr(request.state, "auth_user", None)
             if auth_user and auth_user.get("email_confirmed_at"):
-                meta = (
-                    auth_user.get("user_metadata")
-                    or auth_user.get("raw_user_meta_data")
-                    or {}
-                )
+                meta = auth_user.get("user_metadata") or auth_user.get("raw_user_meta_data") or {}
                 role_hint = str(meta.get("role") or meta.get("intended_role") or "").capitalize()
                 role = UserRole.RIDER if role_hint == "Rider" else UserRole.DISPATCHER
                 name = (
                     meta.get("shop_name")
                     or meta.get("shop")
                     or meta.get("name")
-                    or (auth_user.get("email", "").split("@")[0] if auth_user.get("email") else "User")
+                    or (
+                        auth_user.get("email", "").split("@")[0]
+                        if auth_user.get("email")
+                        else "User"
+                    )
                 )
                 email = auth_user.get("email") or f"{subject}@users.invalid"
                 actor = User(

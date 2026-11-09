@@ -1,9 +1,12 @@
 import datetime
 import json
 import uuid
+
 from sqlalchemy import text
+
 from app.core.config import Settings
 from app.db.session import Database
+
 
 def provision_rider():
     s = Settings()
@@ -12,25 +15,33 @@ def provision_rider():
     email = "rider.aung@lannpya.dev"
 
     with db.sessions.begin() as session:
-        user_row = session.execute(
-            text("SELECT instance_id, encrypted_password FROM auth.users ORDER BY created_at ASC LIMIT 1")
-        ).mappings().one()
+        user_row = (
+            session.execute(
+                text(
+                    "SELECT instance_id, encrypted_password FROM auth.users ORDER BY created_at ASC LIMIT 1"
+                )
+            )
+            .mappings()
+            .one()
+        )
         instance_id = user_row["instance_id"]
         pwd_hash = user_row["encrypted_password"]
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
 
         existing = session.execute(
             text("SELECT id FROM auth.users WHERE id=:id"), {"id": rider_id}
         ).scalar()
 
         if not existing:
-            raw_meta = json.dumps({
-                "sub": str(rider_id),
-                "email": email,
-                "name": "Ko Aung",
-                "email_verified": True,
-                "phone_verified": False
-            })
+            raw_meta = json.dumps(
+                {
+                    "sub": str(rider_id),
+                    "email": email,
+                    "name": "Ko Aung",
+                    "email_verified": True,
+                    "phone_verified": False,
+                }
+            )
             raw_app_meta = json.dumps({"provider": "email", "providers": ["email"]})
 
             session.execute(
@@ -54,7 +65,7 @@ def provision_rider():
                     "now": now,
                     "raw_app_meta": raw_app_meta,
                     "raw_meta": raw_meta,
-                }
+                },
             )
 
             identity_id = uuid.uuid4()
@@ -72,7 +83,7 @@ def provision_rider():
                     "user_id": rider_id,
                     "raw_meta": raw_meta,
                     "now": now,
-                }
+                },
             )
             print("Successfully inserted into auth.users and auth.identities")
         else:
@@ -90,14 +101,15 @@ def provision_rider():
                         email_change_token_current = COALESCE(email_change_token_current, '')
                     WHERE id = :id
                 """),
-                {"id": rider_id}
+                {"id": rider_id},
             )
 
         session.execute(
             text("UPDATE public.users SET email=:email, name='Ko Aung' WHERE id=:id"),
-            {"email": email, "id": rider_id}
+            {"email": email, "id": rider_id},
         )
         print("Updated public.users for Ko Aung")
+
 
 if __name__ == "__main__":
     provision_rider()

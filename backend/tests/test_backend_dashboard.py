@@ -74,7 +74,14 @@ def buyer(client, handle, method="GET", suffix="", body=None, status=200):
         demo = client.get("/dashboard/buyer-otp", params={"buyer_handle": handle})
         if demo.status_code != 200:
             if buyer(client, handle).get("state") == "LOCKED":
-                return call(client, method, "/api/confirm/@buyer" + suffix, {"code": "000000"}, status, buyer_handle=handle)
+                return call(
+                    client,
+                    method,
+                    "/api/confirm/@buyer" + suffix,
+                    {"code": "000000"},
+                    status,
+                    buyer_handle=handle,
+                )
             call(client, "POST", "/api/confirm/@buyer/otp", {}, buyer_handle=handle)
             demo = client.get("/dashboard/buyer-otp", params={"buyer_handle": handle})
         if body["code"] == "000000":
@@ -161,7 +168,9 @@ def test_dashboard_proxy_is_allowlisted_and_not_ssrf(dashboard, path):
     assert "private-secret-token" not in json.dumps(data)
 
 
-def test_dispatcher_auto_assignment_proxy_is_protected_and_legacy_prepare_is_not_allowlisted(dashboard):
+def test_dispatcher_auto_assignment_proxy_is_protected_and_legacy_prepare_is_not_allowlisted(
+    dashboard,
+):
     client, _, _ = dashboard
     order_id = str(uuid4())
     accepted = call(
@@ -178,7 +187,7 @@ def test_dispatcher_auto_assignment_proxy_is_protected_and_legacy_prepare_is_not
     assert accepted["error"]["code"] != "PATH_REJECTED"  # valid contract reaches the backend
     rejected = call(client, "POST", f"/api/orders/{order_id}/prepare-assignment", {}, 400)
     assert rejected["error"]["code"] == "PATH_REJECTED"
-    rider = call(client, "GET", "/api/riders") ["items"][0]
+    rider = call(client, "GET", "/api/riders")["items"][0]
     scoped = client.post(
         "/dashboard/api",
         json={
@@ -457,7 +466,9 @@ def test_dashboard_demo_code_is_hidden_after_parent_link_invalidation(dashboard,
     assert unavailable.status_code == 404
     with box.database.sessions() as session:
         challenge = session.scalar(
-            select(BuyerOtpChallenge).where(BuyerOtpChallenge.link_id == UUID(box.buyers[handle]["link_id"]))
+            select(BuyerOtpChallenge).where(
+                BuyerOtpChallenge.link_id == UUID(box.buyers[handle]["link_id"])
+            )
         )
         if invalidation == "cancel":
             assert challenge.status == "REVOKED" and challenge.demo_code is None

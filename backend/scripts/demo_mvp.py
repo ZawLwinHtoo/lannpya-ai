@@ -209,7 +209,9 @@ class LocalDemo:
             code = session.get(BuyerOtpChallenge, UUID(challenge["challenge_id"])).demo_code
         if not code:
             raise RuntimeError("Isolated demo OTP fixture did not create a test code")
-        result = self.expect("buyer_verification", public.post(path + "/verify", json={"code": code}))
+        result = self.expect(
+            "buyer_verification", public.post(path + "/verify", json={"code": code})
+        )
         self.redactions.append(result["access_token"])
         public.headers["Authorization"] = "Bearer " + result["access_token"]
         return public, path

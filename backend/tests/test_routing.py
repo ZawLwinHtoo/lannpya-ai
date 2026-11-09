@@ -110,11 +110,18 @@ def test_missing_credentials_external_gate_and_no_silent_fallback():
         with pytest.raises(RoutingFailure, match="KEY_MISSING"):
             HTTPProvider(s).ready("DRIVE")
     with pytest.raises(RoutingFailure, match="FORBIDDEN"):
-        provider_for(Settings(
-            _env_file=None, environment="production", buyer_otp_mode="twilio",
-            buyer_otp_external_sends_enabled=True, buyer_twilio_account_sid="ACtest",
-            buyer_twilio_auth_token="test-token", buyer_twilio_verify_service_sid="VAtest",
-        ), True)
+        provider_for(
+            Settings(
+                _env_file=None,
+                environment="production",
+                buyer_otp_mode="twilio",
+                buyer_otp_external_sends_enabled=True,
+                buyer_twilio_account_sid="ACtest",
+                buyer_twilio_auth_token="test-token",
+                buyer_twilio_verify_service_sid="VAtest",
+            ),
+            True,
+        )
     with pytest.raises(RoutingFailure, match="DISABLED"):
         provider_for(Settings(_env_file=None, routing_provider="disabled"), True)
 

@@ -499,14 +499,21 @@ class RiderService:
             if not route_id:
                 raise OrderAPIError(409, "ROUTE_REQUIRED", "Refresh the assigned delivery route.")
             route = route_row(self.session, UUID(route_id), self.actor, lock=True)
-            if (route.data["state"] not in {"draft", "dispatched"}
-                    or str(order.id) not in route.data["order_ids"]):
+            if (
+                route.data["state"] not in {"draft", "dispatched"}
+                or str(order.id) not in route.data["order_ids"]
+            ):
                 raise OrderAPIError(409, "ROUTE_NOT_ASSIGNABLE", "Refresh the delivery route.")
             data = {**route.data, "state": "dispatched"}
-            data["events"] = [*data.get("events", []), {
-                "action": "ACCEPT", "by": str(self.actor.id),
-                "at": assignment.responded_at.isoformat(), "reason": None,
-            }]
+            data["events"] = [
+                *data.get("events", []),
+                {
+                    "action": "ACCEPT",
+                    "by": str(self.actor.id),
+                    "at": assignment.responded_at.isoformat(),
+                    "reason": None,
+                },
+            ]
             route.data = data
             previous, order.status = order.status, OrderStatus.OUT_FOR_DELIVERY
             allocation.reason = "Rider accepted; delivery in progress."
