@@ -1,4 +1,5 @@
 import { toAsciiDigits } from "./encoding.ts";
+import { findTownship } from "./townships.ts";
 
 /**
  * Layer 1: deterministic rules. Phone numbers and money are only ever produced here, never by the AI.
@@ -150,7 +151,7 @@ export function extractName(text: string): NameMatch | null {
     if (!value) {
       const { head, beforePhone } = nameHead(line);
       const nextIsPhone = !!lines[i + 1] && extractPhones(lines[i + 1]).length > 0 && extractPhones(line).length === 0;
-      if (head && head.length <= 40 && !PLACE_WORD_RE.test(head)) {
+      if (head && head.length <= 40 && !PLACE_WORD_RE.test(head) && !findTownship(head)) {
         const honorific = head.match(HONORIFIC_RE)?.[1];
         value = honorific ?? ((beforePhone || nextIsPhone) && PLAIN_NAME_RE.test(head) ? head : undefined);
       }

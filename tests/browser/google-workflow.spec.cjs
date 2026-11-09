@@ -5,7 +5,7 @@ async function order(page){
   await page.goto('/#/manual');const f=page.locator('#manual-form');await expect(f).toBeVisible();
   for(const [k,v]of Object.entries({name:'Fictional Google Test Buyer',phone:'09790000000',item:'Test shirt',street:'Synthetic street',expected:'25000'}))await f.locator(`[name=${k}]`).fill(v);
   await f.locator('[name=areaId]').selectOption('Hlaing');await f.locator('[name=received]').check();
-  await f.locator('button').last().click();await expect(page.locator('#edit-form')).toBeVisible();
+  await f.locator('button').last().click();await page.locator('[data-created=open]').click();await expect(page.locator('#edit-form')).toBeVisible();
   return new URL(page.url()).hash.split('/').at(-1);
 }
 async function mockGoogle(page,fail=false,observation='GOOGLE_MOCK'){
