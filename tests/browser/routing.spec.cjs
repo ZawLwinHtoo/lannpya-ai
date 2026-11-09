@@ -46,7 +46,7 @@ test('routing preview, explicit commit, map geometry, rider COD and safe remaini
   await expect(page.locator('.google-road-estimate button[type=submit]')).toBeDisabled();
   await expect(page.locator('[data-plan-map].leaflet-container')).toHaveCount(1);
   await expect(page.locator('a[href*="google.com/maps/dir"]')).toBeVisible();
-  await page.locator('[data-action=delivered]').click();await page.locator('dialog [name=amount]').fill('25000');await page.locator('dialog [name=amount]').fill('25000');await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
+  await page.locator('[data-action=delivered]').click();await page.locator('dialog [name=amount]').fill('25000');await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   const all=await inspect(page,'/api/orders');expect(all.items.filter(o=>o.status==='DELIVERED')).toHaveLength(1);
   await plan(page);await expect(page.locator('#routing-preview')).toContainText('Stop 1');
   const re=page.locator('#commit-routing-plan');await re.locator('[name=ack]').check();await re.locator('[name=simulation]').check();await re.locator('[type=submit]').click();

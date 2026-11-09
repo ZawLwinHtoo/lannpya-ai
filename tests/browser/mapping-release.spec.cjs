@@ -58,7 +58,7 @@ for(const [width,height] of [[1440,900],[1366,768],[768,1024],[390,844],[360,740
       await page.context().route('https://www.google.com/maps/**',r=>r.fulfill({status:200,contentType:'text/html',body:'Synthetic navigation target; no Google network call'}));
       const popup=page.waitForEvent('popup');await navigation.click();const opened=await popup;await opened.waitForLoadState();expect(opened.url()).toContain('google.com/maps/dir');await opened.close();
       await noOverflow(page);await screenshot(page,`${width}-rider-route`);
-      await page.locator('[data-action=delivered]').click();await page.locator('dialog [name=amount]').fill('25000');await page.locator('dialog [name=amount]').fill('25000');await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
+      await page.locator('[data-action=delivered]').click();await page.locator('dialog [name=amount]').fill('25000');await page.locator('dialog [name=codCollected]').check();await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
       expect((await inspect(page,'/api/orders/'+id)).status).toBe('DELIVERED');
       expect((await inspect(page,'/api/orders/'+id+'/events')).items.some(e=>e.event_type==='DELIVERY_COMPLETED')).toBe(true);
       await page.goto('/#/routes');await expect(page.locator('[data-open-plan]')).toHaveCount(1);await page.locator('[data-open-plan]').click();await expect(page.locator('#routing-preview')).toContainText('STALE');

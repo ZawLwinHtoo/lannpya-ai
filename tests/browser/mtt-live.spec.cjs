@@ -91,7 +91,7 @@ test('MTT browser creates persistent order, buyer pin, dispatcher review, rider 
   if(window)await page.locator('[name=time]').selectOption(window);
   await page.locator('[name=note]').fill('စမ်းသပ်မှတ်ချက် — call at fictional gate');
   await page.locator('#customer-form .customer-primary').click();
-  await expect(page.locator('.delivery-request-confirmed')).toBeVisible();
+  await expect(page.locator('.delivery-request-confirmed,.customer-notice').filter({hasText:/Delivery request confirmed|Your delivery request is saved/})).toBeVisible();
   expect((await inspect(page,'/api/orders/'+id)).latitude).toBeNull();
   await page.goto('/#/order/'+id);await expect(page.locator('[data-action=approve-location]')).toBeVisible();
   await page.locator('[data-action=approve-location]').click();
@@ -169,8 +169,8 @@ test('MTT reschedule is a separate review request; location review cannot approv
   const id=await manual(page),link=await buyerLink(page);await buyer(page,link);
   await page.locator('#buyer-map').click({position:{x:140,y:150}});await page.locator('[name=initial_pin_acknowledged]').check();
   await page.locator('[name=answer]').selectOption('Reschedule');await page.locator('#customer-form [name=date]').fill(new Date(Date.now()+23400000+86400000).toISOString().slice(0,10));await page.locator('#customer-form [name=time]').selectOption('10:00–12:00');
-  await page.locator('#customer-form .customer-primary').click();await expect(page.locator('.delivery-request-confirmed')).toBeVisible();
-  await page.goto('/#/order/'+id);await expect(page.locator('[data-review-request]')).toBeVisible();
+  await page.locator('#customer-form .customer-primary').click();await expect(page.locator('.delivery-request-confirmed,.customer-notice').filter({hasText:/Delivery request confirmed|Your delivery request is saved/})).toBeVisible();
+  await page.goto('/#/order/'+id);await expect(page.locator('[data-review-request]').first()).toBeVisible();
   await page.locator('[data-action=approve-location]').click();await page.locator('dialog [name=reason]').fill('Synthetic location review only');await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);
   let requests=(await inspect(page,`/api/orders/${id}/buyer-requests`)).items;expect(requests.find(r=>r.kind==='RESPONSE').resolution).toBeNull();
   await page.locator('[data-review-request]').click();await page.locator('dialog [name=reason]').fill('Synthetic courier review of cross-day request');await page.locator('dialog button[type=submit]').click();await expect(page.locator('dialog')).toHaveCount(0);

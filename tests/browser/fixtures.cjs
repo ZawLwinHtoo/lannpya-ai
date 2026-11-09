@@ -132,6 +132,22 @@ async function approve(page,id){
 }
 async function assignDispatch(page){
   const orderId=new URL(page.url()).hash.split('/').at(-1);
+  // Record a real verified availability response before using automatic allocation.
+  const boot=await (await page.request.get('/dashboard/bootstrap')).json();
+  const call=async(path,method,body,buyer_handle=null)=>{
+    const result=await page.request.post('/dashboard/api',{headers:{Origin:new URL(page.url()).origin,'X-Dashboard-CSRF':boot.csrf},data:{method,path,body,actor:'dispatcher',buyer_handle}});
+    expect(result.ok()).toBeTruthy();return (await result.json()).data;
+  };
+  const history=(await inspect(page,`/api/orders/${orderId}/buyer-requests`)).items;
+  if(!history.some(r=>r.kind==='RESPONSE'&&['AVAILABLE','RESCHEDULE'].includes(r.submitted_values.action)&&(r.decision==='APPLIED'||r.resolution==='APPROVE'))){
+    const link=await call(`/api/orders/${orderId}/confirmation-link`,'POST',null);
+    const handle=link.buyer_handle;
+    await call('/api/confirm/@buyer/otp','POST',{},handle);
+    const code=(await (await page.request.get('/dashboard/buyer-otp?buyer_handle='+encodeURIComponent(handle))).json()).code;
+    await call('/api/confirm/@buyer/verify','POST',{code},handle);
+    await call('/api/confirm/@buyer/response','PATCH',{request_id:crypto.randomUUID(),action:'AVAILABLE'},handle);
+    await page.reload();
+  }
   const form=page.locator('#auto-assignment-form');await expect(form).toBeVisible();
   if(await form.locator('[name=received]').count())await form.locator('[name=received]').check();
   await form.locator('[name=ack]').check();await form.locator('button[type=submit]').click();
@@ -140,9 +156,9 @@ async function assignDispatch(page){
   const offer=offers.at(-1);if(!offer)throw Error('Automatic assignment did not create an offer.');
   await enter(page,'rider',offer.rider_id);await expect(page.locator('[data-action=accept-offer]')).toBeVisible();
   await page.locator('[data-action=accept-offer]').click();await expect(page.locator('#api-status')).not.toHaveClass(/error/);
-  await enter(page,'admin');await page.goto('/api.html#/order/'+orderId);await expect(page.locator('[data-action=dispatch]')).toBeVisible();
-  await page.locator('[data-action=dispatch]').click();await page.locator('dialog button[type=submit]').click();
-  await expect(page.locator('dialog')).toHaveCount(0);
+  await enter(page,'admin');await page.goto('/api.html#/order/'+orderId);
+  expect((await inspect(page,'/api/orders/'+orderId)).status).toBe('OUT_FOR_DELIVERY');
+  return offer.rider_id;
 }
 async function shot(page,name){
   fs.mkdirSync(shots,{recursive:true});
