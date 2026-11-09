@@ -64,7 +64,7 @@ test('complete browser-only order, buyer, approval, rider COD and hub closeout j
   await expect(page.locator('[data-action=deliver]')).toHaveCount(0);
   await page.locator('[data-action=accept-offer]').click();
   await expect(page.locator('[data-action=accept-offer]')).toHaveCount(0);
-  await expect(page.locator('[data-action=deliver]')).toHaveCount(0);
+  await expect(page.locator('[data-action=deliver]')).toBeVisible();
   await page.setViewportSize({width:390,height:844});await shot(page,'rider-accepted-mobile');
   await page.setViewportSize({width:1440,height:900});
   await enter(page,'admin');await page.goto('/api.html#/order/'+id);
@@ -195,8 +195,7 @@ test('buyer invalid coordinates, instructions, rescheduling and rejection remain
 
 test('rider failure, cancellation of modal, refresh and physical return requirement',async({page})=>{
   const id=await create(page,{pin:true});await assignDispatch(page);
-  await page.locator('.role-switch a[href="#/rider"]').click();
-  await page.locator('#connect-form button[type=submit]').click();
+  await enter(page,'rider');
   await page.locator('[data-action=deliver]').click();await page.locator('dialog [data-cancel]').click();
   expect((await inspect(page,'/api/orders/'+id)).status).toBe('OUT_FOR_DELIVERY');
   await page.locator('[data-action=failed]').click();
@@ -213,8 +212,7 @@ test('rider failure, cancellation of modal, refresh and physical return requirem
 
 test('rider navigation waits for a pending dispatch refresh before connecting',async({page})=>{
   const id=await create(page,{pin:true});await assignDispatch(page);
-  await page.locator('.role-switch a[href="#/rider"]').click();
-  await page.locator('#connect-form button[type=submit]').click();
+  await enter(page,'rider');
   await expect(page.locator('.current-stop')).toBeVisible();
   expect((await inspect(page,'/api/orders/'+id)).status).toBe('OUT_FOR_DELIVERY');
 });
@@ -406,7 +404,7 @@ test('parcel incident resolution and draft unassignment use persistent workflow 
 
 test('failed parcel requires physical return before zero-cash route closeout',async({page})=>{
   const id=await create(page,{pin:true});await assignDispatch(page);
-  await page.locator('.role-switch a[href="#/rider"]').click();await page.locator('#connect-form button[type=submit]').click();
+  await enter(page,'rider');
   await page.locator('[data-action=failed]').click();await page.locator('dialog button[type=submit]').click();
   await expect(page.locator('[data-action=failed]')).toHaveCount(0);
   await expect(page.locator('[data-action=handover]')).toHaveCount(0);

@@ -146,7 +146,8 @@ async function assignDispatch(page){
     const code=(await (await page.request.get('/dashboard/buyer-otp?buyer_handle='+encodeURIComponent(handle))).json()).code;
     await call('/api/confirm/@buyer/verify','POST',{code},handle);
     await call('/api/confirm/@buyer/response','PATCH',{request_id:crypto.randomUUID(),action:'AVAILABLE'},handle);
-    await page.reload();
+    await enter(page,'admin');
+    await page.goto('/api.html#/order/'+orderId);
   }
   const form=page.locator('#auto-assignment-form');await expect(form).toBeVisible();
   if(await form.locator('[name=received]').count())await form.locator('[name=received]').check();
