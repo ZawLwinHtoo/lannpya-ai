@@ -282,7 +282,7 @@ class BuyerConfirmationService:
             raise OrderAPIError(
                 404,
                 "ORDER_NOT_FOUND",
-                "No delivery found matching this Tracking ID and phone number. Check your order reference and phone number.",
+                "No delivery found matching this Tracking ID and phone number. Check your order reference and phone number.",  # noqa: E501 — preserve literal message or SQL
             )
 
         if matched_order.status == OrderStatus.CANCELLED:
@@ -1264,7 +1264,7 @@ class BuyerConfirmationService:
                 value = BuyerRequestSubmission.model_validate(values)
                 # Location has its own request and requires its own approval.
                 changes = {
-                    "delivery_time_window": f"{value.time_window.start.astimezone(UTC).isoformat()}/{value.time_window.end.astimezone(UTC).isoformat()}",
+                    "delivery_time_window": f"{value.time_window.start.astimezone(UTC).isoformat()}/{value.time_window.end.astimezone(UTC).isoformat()}",  # noqa: E501 — preserve literal message or SQL
                     "delivery_instructions": value.instructions,
                 }
             elif row.kind == "LOCATION":

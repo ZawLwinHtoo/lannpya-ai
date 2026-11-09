@@ -60,7 +60,7 @@ def _message(order, policy):
     return (
         f"LannPya delivery reminder for {day}, {_display_window(order)}. "
         f"You can make up to 3 delivery detail edits; {max(0, 3 - policy.edit_count)} remain. "
-        f"Edits close at {cutoff} (1 hour before delivery starts). Use the buyer link already shared by the shop."
+        f"Edits close at {cutoff} (1 hour before delivery starts). Use the buyer link already shared by the shop."  # noqa: E501 — preserve literal message or SQL
     )
 
 

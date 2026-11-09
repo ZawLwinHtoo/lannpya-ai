@@ -52,7 +52,7 @@ def upgrade():
         sa.Column("outcome_at", sa.DateTime(timezone=True)),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint(
-            "status IN ('PENDING','SENDING','ACCEPTED','UNKNOWN','SIMULATION','SKIPPED','DISABLED')",
+            "status IN ('PENDING','SENDING','ACCEPTED','UNKNOWN','SIMULATION','SKIPPED','DISABLED')",  # noqa: E501 — preserve literal message or SQL
             name="ck_buyer_reminder_status",
         ),
     )
